@@ -1,0 +1,26 @@
+{
+  "name": "discord-community-bot",
+  "version": "1.0.0",
+  "description": "Discord Bot for Role & Access Management, Tournament Management, and Support Ticket System",
+  "main": "src/launch.js",
+  "scripts": {
+    "start": "node src/launch.js",
+    "main-bot": "node src/index.js",
+    "pay-bot": "node payment-bot/src/index.js"
+  },
+  "keywords": [
+    "discord",
+    "bot",
+    "tournament",
+    "ticket",
+    "roles",
+    "discordjs"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "discord.js": "^14.18.0",
+    "dotenv": "^16.4.7",
+    "express": "^5.2.1"
+  }
+}

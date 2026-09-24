@@ -1,0 +1,83 @@
+{
+  "guild_settings": {
+    "1543502896753287198": {
+      "guild_id": "1543502896753287198",
+      "visitor_role_id": "1543513816720220273",
+      "member_role_id": "1543513819773407262",
+      "updated_at": "2026-09-23T06:47:19.513Z",
+      "ticket_category_id": "1543513849439854674",
+      "support_voice_id": "1543513860542038036",
+      "rules_channel_id": "1543513823913181184",
+      "rules_message_id": "1552000558540267674",
+      "ticket_panel_message_id": "1552000633979015239",
+      "tournament_category_id": "1543513845098745867",
+      "payment_desk_id": "1552000650798301334",
+      "admin_verification_channel_id": "1552000659044438136"
+    }
+  },
+  "tournaments": [
+    {
+      "id": 1,
+      "guild_id": "1543502896753287198",
+      "title": "eFootball 1v1 Open League",
+      "game": "eFootball",
+      "mode": "solo",
+      "max_participants": 8,
+      "entry_fee": "₹250 per Player",
+      "prize_pool": "1st: ₹1,500 Instant Cash",
+      "gpay_info": "UPI ID: sinoprince366-1@okhdfcbank\nAmount: ₹250 per Player\nScan QR Code on Dashboard to pay",
+      "rules_text": "Single Elimination knockout. 10 Mins regular time, Extra Time & Penalties enabled.",
+      "status": "STARTED",
+      "dashboard_channel_id": "1552225388380291133",
+      "dashboard_message_id": "1552693818221142217",
+      "category_id": "1551993197381554237",
+      "announcements_channel_id": "1552200604703785030",
+      "chat_channel_id": "1543572521280995370",
+      "scores_channel_id": "1552200610886058014",
+      "voice_channel_ids": [
+        "1543572523285876776"
+      ],
+      "tournament_role_id": "1552693805369524427",
+      "pending_role_id": "1552693807382925338",
+      "created_by": "1543509917351149649",
+      "created_at": "2026-09-24T14:50:51.716Z",
+      "scoreboard_channel_id": "1552200610886058014",
+      "scoreboard_message_id": "1552693823493120032"
+    }
+  ],
+  "tournament_participants": [
+    {
+      "id": 1790261555430,
+      "tournament_id": 1,
+      "user_id": "prince",
+      "username": "narachi",
+      "ingame_id": "12345678",
+      "squad_name": "narachi",
+      "transaction_id": "123456789012",
+      "payment_status": "CONFIRMED",
+      "registered_at": "2026-09-24T14:52:34.726Z",
+      "updated_at": "2026-09-24T15:00:02.937Z"
+    },
+    {
+      "id": 1790261568638,
+      "tournament_id": 1,
+      "user_id": "volk",
+      "username": "volk",
+      "ingame_id": "12345678",
+      "squad_name": "volk",
+      "transaction_id": "1234567890123",
+      "payment_status": "CONFIRMED",
+      "registered_at": "2026-09-24T14:52:48.544Z"
+    }
+  ],
+  "scoreboard_entries": [],
+  "payments": [],
+  "invoices": [],
+  "tickets": [],
+  "counters": {
+    "tournament_id": 1,
+    "payment_id": 1000,
+    "invoice_id": 5000,
+    "ticket_numbers": {}
+  }
+}

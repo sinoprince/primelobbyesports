@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prime Lobby Esports — Tournament Management Software</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- Login Modal / Screen -->
+  <div id="loginOverlay" class="login-overlay">
+    <div class="login-card">
+      <div class="brand-badge">🛡️ ADMIN PORTAL</div>
+      <h2>Prime Lobby Esports</h2>
+      <p class="subtitle">Tournament Management & Billing Software</p>
+      
+      <form id="loginForm" onsubmit="handleLogin(event)">
+        <div class="form-group">
+          <label for="adminPin">Admin Access PIN / Secret Key</label>
+          <input type="password" id="adminPin" placeholder="Enter Admin Secret (e.g. PLE-ADMIN-2026)" required autocomplete="current-password">
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">🔓 Access Management Software</button>
+      </form>
+      <div id="loginError" class="alert alert-danger hidden"></div>
+      <p class="login-footer">🔒 Restricted to authorized Discord Server Administrators & Staff.</p>
+    </div>
+  </div>
+
+  <!-- Main Software Dashboard -->
+  <div id="appContainer" class="app-container hidden">
+
+    <!-- Top Navigation Bar -->
+    <header class="top-nav">
+      <div class="nav-brand">
+        <span class="logo-icon">🏆</span>
+        <div>
+          <span class="brand-title">PRIME LOBBY ESPORTS</span>
+          <span class="brand-sub">Tournament Management Software</span>
+        </div>
+      </div>
+
+      <nav class="nav-tabs">
+        <button class="nav-tab active" onclick="switchTab('tournaments')">🏆 Tournaments</button>
+        <button class="nav-tab" onclick="switchTab('participants')">👥 Teams & Slots</button>
+        <button class="nav-tab" onclick="switchTab('payments')">💳 Payment Ledger</button>
+        <button class="nav-tab" onclick="switchTab('scoreboard')">📊 Match Scoreboard</button>
+        <button class="nav-tab" onclick="switchTab('tickets')">🎫 Support Tickets</button>
+        <button class="nav-tab" onclick="switchTab('announcements')">📢 Announcements</button>
+        <button class="nav-tab" onclick="switchTab('server-setup')">⚙️ Server Setup</button>
+      </nav>
+
+      <div class="nav-actions">
+        <span class="status-indicator online" title="Discord Bots Connected">● Live Bot Sync</span>
+        <button class="btn btn-sm btn-outline" onclick="refreshCurrentTab()">🔄 Refresh</button>
+        <button class="btn btn-sm btn-danger-outline" onclick="logout()">Logout</button>
+      </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+
+      <!-- Statistics Banner -->
+      <section class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-header">
+            <span class="stat-title">ACTIVE CUPS</span>
+            <span class="stat-icon">🎮</span>
+          </div>
+          <div class="stat-value" id="statActiveTourneys">0</div>
+          <div class="stat-sub" id="statTotalTourneys">0 Total Hosted</div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-header">
+            <span class="stat-title">COMPETITORS</span>
+            <span class="stat-icon">👥</span>
+          </div>
+          <div class="stat-value" id="statConfirmedParticipants">0</div>
+          <div class="stat-sub" id="statTotalParticipants">0 Total Teams Registered</div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-header">
+            <span class="stat-title">PENDING VERIFICATION</span>
+            <span class="stat-icon">⏳</span>
+          </div>
+          <div class="stat-value text-warning" id="statPendingPayments">0</div>
+          <div class="stat-sub">Awaiting Proof Review</div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-header">
+            <span class="stat-title">VERIFIED REVENUE</span>
+            <span class="stat-icon">💰</span>
+          </div>
+          <div class="stat-value text-success" id="statTotalRevenue">₹0</div>
+          <div class="stat-sub" id="statApprovedPayments">0 Approved Payments</div>
+        </div>
+      </section>
+
+      <!-- TAB 1: Tournaments Management -->
+      <section id="tab-tournaments" class="tab-pane active">
+        <div class="pane-header">
+          <div>
+            <h2>🏆 Tournament Command Center</h2>
+            <p>Deploy tournaments to Discord, track live slot balances, and broadcast match start alerts.</p>
+          </div>
+          <button class="btn btn-primary" onclick="openHostModal()">➕ Host New Tournament</button>
+        </div>
+
+        <!-- Filter bar -->
+        <div class="filter-bar">
+          <button class="filter-pill active" onclick="filterTournaments('all')">All Tournaments</button>
+          <button class="filter-pill" onclick="filterTournaments('OPEN')">🟢 Open for Registration</button>
+          <button class="filter-pill" onclick="filterTournaments('STARTED')">⚔️ In Progress</button>
+          <button class="filter-pill" onclick="filterTournaments('COMPLETED')">🏁 Completed</button>
+        </div>
+
+        <div id="tournamentsList" class="tournaments-grid">
+          <!-- Dynamic Tournament Cards Loaded Here -->
+        </div>
+      </section>
+
+      <!-- TAB 2: Teams & Slot Balance Hub -->
+      <section id="tab-participants" class="tab-pane">
+        <div class="pane-header">
+          <div>
+            <h2>👥 Teams & Slot Balance Hub</h2>
+            <p>View registered squads, duos, and player IGNs. Track balance teams that can still join.</p>
+          </div>
+          <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <div class="select-wrapper">
+              <select id="participantTourneySelect" onchange="loadParticipantsForSelected()">
+                <option value="">Select Tournament...</option>
+              </select>
+            </div>
+            <button class="btn btn-primary" onclick="openAddTeamModal()">➕ Add Team</button>
+          </div>
+        </div>
+
+        <div id="slotBalanceBanner" class="slot-balance-banner hidden">
+          <!-- Live Slot Balance Stats -->
+        </div>
+
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Team / Duo Name</th>
+                <th>In-Game ID / IGN</th>
+                <th>Discord User</th>
+                <th>Slot Status</th>
+                <th>Registered At</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="participantsTableBody">
+              <tr>
+                <td colspan="7" class="text-center text-muted">Select a tournament above to view registered teams.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- TAB 3: Payment Verification & Ledger Hub -->
+      <section id="tab-payments" class="tab-pane">
+        <div class="pane-header">
+          <div>
+            <h2>💳 Payment Verification & Ledger Hub</h2>
+            <p>Inspect 12-digit UTRs, preview screenshot proofs, and issue digital invoices via PLE Payments Bot.</p>
+          </div>
+          <div class="filter-bar">
+            <button class="filter-pill active" onclick="filterPayments('all')">All Payments</button>
+            <button class="filter-pill" onclick="filterPayments('PENDING')">⏳ Pending Verification</button>
+            <button class="filter-pill" onclick="filterPayments('APPROVED')">✅ Approved</button>
+            <button class="filter-pill" onclick="filterPayments('REJECTED')">❌ Rejected</button>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Player</th>
+                <th>Team / IGN</th>
+                <th>Amount</th>
+                <th>Purpose / Cup</th>
+                <th>UTR Reference</th>
+                <th>Screenshot</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="paymentsTableBody">
+              <!-- Dynamic Payments Loaded Here -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- TAB 4: Match Scoreboard -->
+      <section id="tab-scoreboard" class="tab-pane">
+        <div class="pane-header">
+          <div>
+            <h2>📊 Live Scoreboard & Standings Broadcaster</h2>
+            <p>Submit round results, points, and kills. Syncs directly with Discord <code>#📊-scoreboard</code>.</p>
+          </div>
+        </div>
+
+        <div class="scoreboard-form-card">
+          <h3>Record Match Result & Update Discord</h3>
+          <form id="scoreForm" onsubmit="handleScoreSubmit(event)">
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label>Tournament</label>
+                <select id="scoreTourneySelect" required>
+                  <option value="">Select Tournament...</option>
+                </select>
+              </div>
+              <div class="form-group flex-1">
+                <label>Match / Round Name</label>
+                <input type="text" id="scoreRound" placeholder="e.g. Map 1: Erangel or Quarterfinals" required>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label>Team 1 / Player 1</label>
+                <input type="text" id="scoreP1" placeholder="e.g. Team Titans (Leader: Slayer)" required>
+              </div>
+              <div class="form-group flex-1">
+                <label>Team 2 / Player 2 (Optional for Battle Royale)</label>
+                <input type="text" id="scoreP2" placeholder="e.g. Shadow Squad or N/A">
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label>Score / Points / Kills Result</label>
+                <input type="text" id="scoreResult" placeholder="e.g. 15 Kills (Winner: WWCD) or 3 - 1" required>
+              </div>
+              <div class="form-group flex-1">
+                <label>Round Winner</label>
+                <input type="text" id="scoreWinner" placeholder="e.g. Team Titans" required>
+              </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary">📢 Broadcast Score to Discord #📊-scoreboard</button>
+          </form>
+        </div>
+      </section>
+
+      <!-- TAB 5: Support Tickets -->
+      <section id="tab-tickets" class="tab-pane">
+        <div class="pane-header">
+          <div>
+            <h2>🎫 Support Tickets Monitor</h2>
+            <p>Active support tickets handled by users with the dedicated <code>Support</code> role.</p>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Ticket #</th>
+                <th>Category</th>
+                <th>Opened By</th>
+                <th>Status</th>
+                <th>Staff Claimed</th>
+                <th>Opened At</th>
+              </tr>
+            </thead>
+            <tbody id="ticketsTableBody">
+              <!-- Dynamic Tickets Loaded Here -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- TAB 6: Announcements Broadcaster -->
+      <section id="tab-announcements" class="tab-pane">
+        <div class="pane-header">
+          <div>
+            <h2>📢 Discord Announcement Broadcaster</h2>
+            <p>Publish formatted embeds, updates, or alerts to any Discord channel without using commands.</p>
+          </div>
+        </div>
+
+        <div class="scoreboard-form-card">
+          <h3>Compose Discord Announcement</h3>
+          <form id="announcementForm" onsubmit="handleSendAnnouncement(event)">
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label>Target Channel</label>
+                <select id="announceChannel" required>
+                  <option value="">Select Channel...</option>
+                </select>
+              </div>
+              <div class="form-group flex-1">
+                <label>Notification Ping</label>
+                <select id="announcePing">
+                  <option value="none">No Mention (Silent)</option>
+                  <option value="here">@here (Online Members)</option>
+                  <option value="everyone">@everyone (All Members)</option>
+                </select>
+              </div>
+              <div class="form-group flex-1">
+                <label>Color Theme</label>
+                <select id="announceColor">
+                  <option value="#FFA500">Gold / Orange (Esports)</option>
+                  <option value="#0099FF">Electric Blue (Official)</option>
+                  <option value="#2ECC71">Emerald Green (Success / Registration)</option>
+                  <option value="#E74C3C">Crimson Red (Urgent / Warning)</option>
+                  <option value="#9B59B6">Purple (Special Event)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Announcement Title / Headline</label>
+              <input type="text" id="announceTitle" placeholder="e.g. 🏆 Registration Open for PUBG Mobile Championship!" required>
+            </div>
+
+            <div class="form-group">
+              <label>Message Content (Supports Markdown, bullet points, emojis)</label>
+              <textarea id="announceMessage" rows="5" placeholder="Enter full announcement details here..." required></textarea>
+            </div>
+
+            <div class="form-group">
+              <label>Banner Image URL (Optional)</label>
+              <input type="url" id="announceImage" placeholder="https://example.com/banner.png">
+            </div>
+
+            <button type="submit" id="btnSendAnnouncement" class="btn btn-primary">🚀 Broadcast Announcement to Discord</button>
+          </form>
+        </div>
+      </section>
+
+      <!-- TAB 7: Server Layout & Bot Control -->
+      <section id="tab-server-setup" class="tab-pane">
+        <div class="pane-header">
+          <div>
+            <h2>⚙️ Server Setup & Discord Infrastructure</h2>
+            <p>Deploy rules panels, support ticket desks, payment panels, and game categories directly to Discord.</p>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px;">
+          <!-- Setup All Card -->
+          <div class="tourney-card">
+            <div class="card-header">
+              <h3 class="card-title">🚀 Complete Clean Rebuild / Setup</h3>
+              <span class="badge badge-open">Full Suite</span>
+            </div>
+            <p class="text-sm text-muted" style="margin: 12px 0;">
+              Automatically verifies and builds Visitor/Member roles, Information category, Rules & Verification panel, 4 Game Categories (PUBG, Valorant, Free Fire, eFootball), Community chat/voice, Support Ticket desk, and Scan-to-Pay Payment Desk.
+            </p>
+            <div style="display: flex; gap: 10px; margin-top: 15px;">
+              <button class="btn btn-primary flex-1" onclick="runServerSetup('all', false)">⚡ Run Full Setup</button>
+              <button class="btn btn-danger-outline flex-1" onclick="runServerSetup('all', true)">🧹 Clean & Rebuild</button>
+            </div>
+          </div>
+
+          <!-- Game Hubs & Roles -->
+          <div class="tourney-card">
+            <div class="card-header">
+              <h3 class="card-title">🎮 4 Game Hubs & Roles</h3>
+              <span class="badge badge-started">Game Hubs</span>
+            </div>
+            <p class="text-sm text-muted" style="margin: 12px 0;">
+              Creates role-locked categories for PUBG, Valorant, Free Fire, and eFootball, along with the interactive dropdown in <code>#🎮-pick-your-games</code>.
+            </p>
+            <button class="btn btn-success btn-block" style="margin-top: 15px;" onclick="runServerSetup('games')">🎮 Deploy Game Hubs & Selector</button>
+          </div>
+
+          <!-- Rules & Member Verification -->
+          <div class="tourney-card">
+            <div class="card-header">
+              <h3 class="card-title">📜 Rules & Verification Desk</h3>
+              <span class="badge badge-open">Security</span>
+            </div>
+            <p class="text-sm text-muted" style="margin: 12px 0;">
+              Posts the interactive rules embed with the <strong>"Verify / Accept Rules"</strong> button. Unlocks the server for new members.
+            </p>
+            <button class="btn btn-info btn-block" style="margin-top: 15px;" onclick="runServerSetup('rules')">📜 Deploy Rules Embed</button>
+          </div>
+
+          <!-- Support Tickets Desk -->
+          <div class="tourney-card">
+            <div class="card-header">
+              <h3 class="card-title">🎫 Support Ticket Desk</h3>
+              <span class="badge badge-started">Helpdesk</span>
+            </div>
+            <p class="text-sm text-muted" style="margin: 12px 0;">
+              Deploys the <code>#🎫-support-helpdesk</code> button embed for members to open private 1-on-1 staff tickets and support channels.
+            </p>
+            <button class="btn btn-outline btn-block" style="margin-top: 15px;" onclick="runServerSetup('tickets')">🎫 Deploy Ticket Desk</button>
+          </div>
+        </div>
+      </section>
+
+    </main>
+    <div id="toast" class="toast hidden"></div>
+  </div>
+
+  <!-- Host Tournament Modal -->
+  <div id="hostModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>➕ Host & Deploy Tournament to Discord</h3>
+        <button class="modal-close" onclick="closeHostModal()">&times;</button>
+      </div>
+
+      <form id="hostForm" onsubmit="handleHostTournament(event)">
+        <!-- Quick Game Presets -->
+        <div class="form-group">
+          <label>Quick Game Preset</label>
+          <div class="preset-buttons">
+            <button type="button" class="preset-btn" onclick="applyPreset('pubg_squad')">📱 PUBG Squad (25)</button>
+            <button type="button" class="preset-btn" onclick="applyPreset('pubg_duo')">📱 PUBG Duo (50)</button>
+            <button type="button" class="preset-btn" onclick="applyPreset('valorant')">🔥 Valorant (15 Teams)</button>
+            <button type="button" class="preset-btn" onclick="applyPreset('freefire_squad')">🔫 Free Fire Squad (12)</button>
+            <button type="button" class="preset-btn" onclick="applyPreset('freefire_duo')">🔫 Free Fire Duo (24)</button>
+            <button type="button" class="preset-btn" onclick="applyPreset('efootball')">⚽ eFootball Solo (8)</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="hostTitle">Tournament Title</label>
+          <input type="text" id="hostTitle" required placeholder="e.g. PUBG Mobile 3-Map Championship">
+        </div>
+
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label for="hostGame">Game Platform</label>
+            <select id="hostGame" required onchange="handleGameSelectChange()">
+              <option value="PUBG Mobile">PUBG Mobile</option>
+              <option value="Valorant">Valorant</option>
+              <option value="Free Fire">Free Fire</option>
+              <option value="eFootball">eFootball</option>
+            </select>
+          </div>
+
+          <div class="form-group flex-1">
+            <label for="hostMode">Format Mode</label>
+            <select id="hostMode" required>
+              <option value="squad">Squad (4 Players)</option>
+              <option value="duo">Duo (2 Players)</option>
+              <option value="5v5">5v5 Team</option>
+              <option value="solo">Solo (1v1)</option>
+            </select>
+          </div>
+
+          <div class="form-group flex-1">
+            <label for="hostMax">Max Teams / Slots</label>
+            <input type="number" id="hostMax" required min="2" max="100" value="25">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label for="hostFee">Entry Fee</label>
+            <input type="text" id="hostFee" required placeholder="e.g. ₹500 per Squad">
+          </div>
+
+          <div class="form-group flex-1">
+            <label for="hostPrize">Prize Pool</label>
+            <input type="text" id="hostPrize" required placeholder="e.g. 1st: ₹3,000 | 2nd: ₹2,000 | 3rd: ₹1,000">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="hostChannel">Target Registration Channel (Discord)</label>
+          <select id="hostChannel">
+            <option value="">Auto-Detect Default Game Registration Channel</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="hostRules">Tournament Rules & Guidelines</label>
+          <textarea id="hostRules" rows="3" placeholder="Enter map sequence, points table, extra rules..."></textarea>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="closeHostModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btnHostSubmit">🚀 Deploy to Discord</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add Team / Participant Modal -->
+  <div id="addTeamModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>👥 Add Team / Participant Manually</h3>
+        <button class="modal-close" onclick="closeAddTeamModal()">&times;</button>
+      </div>
+
+      <form id="addTeamForm" onsubmit="handleAddTeamSubmit(event)">
+        <div class="form-group">
+          <label for="addTeamTourneySelect">Target Tournament</label>
+          <select id="addTeamTourneySelect" required>
+            <option value="">Select Tournament...</option>
+          </select>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label for="addTeamName">Team / Duo Name</label>
+            <input type="text" id="addTeamName" required placeholder="e.g. Team Titans or Soul">
+          </div>
+
+          <div class="form-group flex-1">
+            <label for="addTeamIgn">In-Game ID / IGN</label>
+            <input type="text" id="addTeamIgn" required placeholder="e.g. 5123456789 or SOUL_Mortal">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label for="addTeamUser">Discord User / Leader (Optional)</label>
+            <input type="text" id="addTeamUser" placeholder="Discord User ID (e.g. 785107558972391435) or Tag">
+          </div>
+
+          <div class="form-group flex-1">
+            <label for="addTeamStatus">Slot Booking Status</label>
+            <select id="addTeamStatus" required>
+              <option value="CONFIRMED" selected>✅ CONFIRMED (Paid & Slot Booked)</option>
+              <option value="PENDING">⏳ RESERVED (Pending / Awaiting Payment)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="addTeamUtr">Transaction / UTR Reference or Note (Optional)</label>
+          <input type="text" id="addTeamUtr" placeholder="e.g. 12-digit UTR or Manual Cash Confirmation">
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="closeAddTeamModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btnAddTeamSubmit">💾 Register Team & Update Discord</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Screenshot Preview Modal -->
+  <div id="screenshotModal" class="modal-overlay hidden">
+    <div class="modal-card modal-image-card">
+      <div class="modal-header">
+        <h3>📸 Payment Proof Screenshot</h3>
+        <button class="modal-close" onclick="closeScreenshotModal()">&times;</button>
+      </div>
+      <div class="modal-body text-center">
+        <img id="previewImage" src="" alt="Payment Screenshot" class="screenshot-full">
+      </div>
+    </div>
+  </div>
+
+  <!-- Close Tournament Modal -->
+  <div id="closeTourneyModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>🏁 End & Close Tournament</h3>
+        <button class="modal-close" onclick="closeCloseTourneyModal()">&times;</button>
+      </div>
+      <form id="closeTourneyForm" onsubmit="handleCloseTournament(event)">
+        <input type="hidden" id="closeTourneyId">
+        <div class="form-group">
+          <label for="closeWinner">Winner & Podium Announcement</label>
+          <textarea id="closeWinner" rows="3" placeholder="e.g. 🥇 1st: Team Titans | 🥈 2nd: Shadow Squad" required></textarea>
+        </div>
+        <div class="form-group">
+          <label>
+            <input type="checkbox" id="closeDeleteChannels"> Delete match and voice channels after concluding
+          </label>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="closeCloseTourneyModal()">Cancel</button>
+          <button type="submit" class="btn btn-danger">Conclude Tournament</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>

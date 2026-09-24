@@ -1,0 +1,104 @@
+{
+  "roles": {
+    "visitor": "Visitor",
+    "member": "Member",
+    "admin": "Admin",
+    "staff": "Support Staff"
+  },
+  "channels": {
+    "rules": "rules",
+    "general": "general-chat",
+    "tournaments": "active-tournaments",
+    "supportDesk": "support-helpdesk",
+    "supportVoice": "🔊 Support Waiting Room",
+    "gameRoles": "pick-your-games",
+    "paymentDesk": "💳-payment-desk",
+    "adminPayments": "🛡️-payment-verification",
+    "paymentLogs": "🧾-payment-ledger-logs"
+  },
+  "categories": {
+    "admin": "🛡️ ADMIN CATEGORY",
+    "tournaments": "🏆 TOURNAMENTS",
+    "tickets": "🎫 SUPPORT TICKETS",
+    "community": "💬 COMMUNITY",
+    "payments": "💳 PAYMENTS"
+  },
+  "payment": {
+    "upiId": "sinoprince366-1@okhdfcbank",
+    "internationalUpiId": "sinoprince366-1@oksbi",
+    "accountName": "Prime Lobby Esports"
+  },
+  "gameRoles": [
+    {
+      "key": "efootball",
+      "name": "eFootball",
+      "categoryName": "⚽ Efootball ⚽",
+      "color": "#00b4d8",
+      "emoji": "⚽",
+      "textChannel": "⚽-efootball",
+      "voiceChannel": "🔊 eFootball Lounge",
+      "registrationChannel": "📝-efootball-registration",
+      "announcementChannel": "📢-efootball-announcements",
+      "scoreboardChannel": "📊-efootball-scoreboard",
+      "description": "Unlock eFootball matches, tournaments & team chat"
+    },
+    {
+      "key": "valorant",
+      "name": "Valorant",
+      "categoryName": "🔥 Valorant 🔥",
+      "color": "#ff0054",
+      "emoji": "🔥",
+      "textChannel": "🔥-valorant",
+      "voiceChannel": "🔊 Valorant Team",
+      "registrationChannel": "📝-valorant-registration",
+      "announcementChannel": "📢-valorant-announcements",
+      "scoreboardChannel": "📊-valorant-scoreboard",
+      "description": "Unlock Valorant competitive 5v5 & party chat"
+    },
+    {
+      "key": "free_fire",
+      "name": "Free Fire",
+      "categoryName": "free fire",
+      "color": "#9d4edd",
+      "emoji": "🔫",
+      "textChannel": "🔫-free-fire",
+      "voiceChannel": "🔊 Free Fire Squad",
+      "registrationChannel": "📝-freefire-registration",
+      "announcementChannel": "📢-freefire-announcements",
+      "scoreboardChannel": "📊-freefire-scoreboard",
+      "description": "Unlock Free Fire customs, squads & tournaments"
+    },
+    {
+      "key": "pubg_mobile",
+      "name": "PUBG Mobile",
+      "categoryName": "Pubg mobile",
+      "color": "#ffb703",
+      "emoji": "📱",
+      "textChannel": "📱-pubg-mobile",
+      "voiceChannel": "🔊 PUBG Mobile Squad",
+      "registrationChannel": "📝-pubg-registration",
+      "announcementChannel": "📢-pubg-announcements",
+      "scoreboardChannel": "📊-pubg-scoreboard",
+      "description": "Unlock PUBG Mobile scrims, squads & tournament chat"
+    }
+  ],
+  "colors": {
+    "primary": "#5865F2",
+    "success": "#57F287",
+    "warning": "#FEE75C",
+    "danger": "#ED4245",
+    "tournament": "#FFA500",
+    "ticket": "#9B59B6"
+  },
+  "emojis": {
+    "verify": "✅",
+    "ticket": "📩",
+    "lock": "🔒",
+    "unlock": "🔓",
+    "trophy": "🏆",
+    "gpay": "💳",
+    "voice": "🔊",
+    "mute": "🔇",
+    "unmute": "🎙️"
+  }
+}
