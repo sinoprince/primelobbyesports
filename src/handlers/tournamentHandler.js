@@ -813,6 +813,38 @@ const tournamentHandler = {
         }
       }
 
+      // Automatically Delete Tournament Roles from Discord Server
+      try {
+        const targetGuild = (adminMember && adminMember.guild) || client.guilds.cache.get(tournament.guild_id) || client.guilds.cache.first();
+        if (targetGuild) {
+          await targetGuild.roles.fetch().catch(() => null);
+
+          // 1. Delete Confirmed Tournament Role
+          if (tournament.tournament_role_id) {
+            const role = targetGuild.roles.cache.get(tournament.tournament_role_id);
+            if (role) {
+              await role.delete(`Tournament #${tournamentId} concluded and roles cleaned up`).catch(err => {
+                console.warn(`[TournamentManager] Could not delete tournament role ${tournament.tournament_role_id}:`, err.message);
+              });
+              console.log(`[TournamentManager] Deleted tournament role: ${role.name} (${role.id})`);
+            }
+          }
+
+          // 2. Delete Pending Tournament Role
+          if (tournament.pending_role_id) {
+            const pendingRole = targetGuild.roles.cache.get(tournament.pending_role_id);
+            if (pendingRole) {
+              await pendingRole.delete(`Tournament #${tournamentId} concluded and roles cleaned up`).catch(err => {
+                console.warn(`[TournamentManager] Could not delete pending role ${tournament.pending_role_id}:`, err.message);
+              });
+              console.log(`[TournamentManager] Deleted pending role: ${pendingRole.name} (${pendingRole.id})`);
+            }
+          }
+        }
+      } catch (roleErr) {
+        console.error(`[TournamentManager] Error deleting tournament roles for #${tournamentId}:`, roleErr.message);
+      }
+
       return {
         success: true,
         message: `🏆 Tournament **#${tournamentId} (${tournament.title})** has been officially closed.`
