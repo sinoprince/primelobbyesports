@@ -6,7 +6,7 @@ const botBridge = require('./botBridge');
 const { dbQueries } = require('../database/db');
 
 const app = express();
-const PORT = process.env.WEB_PORT || 3000;
+const PORT = process.env.PORT || process.env.WEB_PORT || 3000;
 const ADMIN_SECRET = process.env.ADMIN_WEB_SECRET || 'PLE-ADMIN-2026';
 
 app.use(express.json());
