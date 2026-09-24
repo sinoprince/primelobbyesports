@@ -8,7 +8,7 @@ console.log('━━━━━━━━━━━━━━━━━━━━━━�
 
 // 1. Launch Main Community & Tournament Bot
 const mainBotPath = path.join(__dirname, 'index.js');
-const mainBot = fork(mainBotPath);
+const mainBot = fork(mainBotPath, [], { env: process.env });
 
 mainBot.on('exit', (code) => {
   console.log(`[MainBot] Process exited with code ${code}`);
@@ -18,7 +18,7 @@ mainBot.on('exit', (code) => {
 let payBot = null;
 if (process.env.PAYMENT_BOT_TOKEN) {
   const payBotPath = path.join(__dirname, '../payment-bot/src/index.js');
-  payBot = fork(payBotPath);
+  payBot = fork(payBotPath, [], { env: process.env });
 
   payBot.on('exit', (code) => {
     console.log(`[PaymentBot] Process exited with code ${code}`);
@@ -29,7 +29,9 @@ if (process.env.PAYMENT_BOT_TOKEN) {
 
 // 3. Launch Web Tournament Management Software
 const webServerPath = path.join(__dirname, 'web/server.js');
-const webServer = fork(webServerPath);
+const webServer = fork(webServerPath, [], {
+  env: process.env
+});
 
 webServer.on('exit', (code) => {
   console.log(`[WebServer] Process exited with code ${code}`);
