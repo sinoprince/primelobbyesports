@@ -971,6 +971,96 @@ const tournamentHandler = {
     } catch (err) {
       console.error(`[TournamentManager] Error notifying slot available for #${tournamentId}:`, err);
     }
+  },
+
+  /**
+   * Automatically executes the 24-hour message purge and 48-hour scoreboard cleanup for closed tournaments.
+   * - At 24 Hours post-closure: Purges all chats, registration messages, and announcement messages.
+   * - At 48 Hours post-closure: Cleans up the scoreboard channel/embed once the 48h podium showcase finishes.
+   */
+  processClosedTournamentsCleanup: async (client) => {
+    const data = dbQueries.getAllTournaments ? dbQueries.getAllTournaments() : [];
+    const now = Date.now();
+    const MS_24_HOURS = 24 * 60 * 60 * 1000;
+    const MS_48_HOURS = 48 * 60 * 60 * 1000;
+
+    for (const t of data) {
+      if (t.status !== 'COMPLETED' && t.status !== 'CLOSED') continue;
+      const closedAt = t.closed_at ? new Date(t.closed_at).getTime() : (t.updated_at ? new Date(t.updated_at).getTime() : 0);
+      if (!closedAt) continue;
+
+      const elapsed = now - closedAt;
+
+      // 1. After 24 Hours: Delete messages in chat and announcements (leaving scoreboard intact)
+      if (elapsed >= MS_24_HOURS && !t.messages_cleaned_24h) {
+        console.log(`[AutoCleanup] 24 Hours elapsed for Tournament #${t.id} (${t.title}). Cleaning messages...`);
+        const channelsToClean = [
+          t.chat_channel_id,
+          t.announcements_channel_id
+        ].filter(Boolean);
+
+        for (const chId of channelsToClean) {
+          // Never clean the scoreboard channel during the 24h phase
+          if (chId === t.scores_channel_id || chId === t.scoreboard_channel_id) continue;
+
+          try {
+            const chan = await client.channels.fetch(chId).catch(() => null);
+            if (chan && typeof chan.bulkDelete === 'function') {
+              const fetched = await chan.messages.fetch({ limit: 100 }).catch(() => null);
+              if (fetched && fetched.size > 0) {
+                // Delete messages (bulkDelete handles messages under 14 days old)
+                await chan.bulkDelete(fetched, true).catch(async () => {
+                  // Fallback for older messages
+                  for (const m of fetched.values()) {
+                    await m.delete().catch(() => null);
+                  }
+                });
+              }
+            }
+          } catch (cleanErr) {
+            console.warn(`[AutoCleanup] Error clearing messages in channel ${chId}:`, cleanErr.message);
+          }
+        }
+
+        // Delete registration dashboard message from registration channel if present
+        if (t.dashboard_channel_id && t.dashboard_message_id) {
+          try {
+            const regChan = await client.channels.fetch(t.dashboard_channel_id).catch(() => null);
+            if (regChan) {
+              const dashMsg = await regChan.messages.fetch(t.dashboard_message_id).catch(() => null);
+              if (dashMsg) await dashMsg.delete().catch(() => null);
+            }
+          } catch (e) {
+            // Ignore if already deleted
+          }
+        }
+
+        dbQueries.updateTournament(t.id, { messages_cleaned_24h: true });
+        console.log(`[AutoCleanup] ✅ 24h message purge finished for Tournament #${t.id}. Scoreboard remains active for podium showcase.`);
+      }
+
+      // 2. After 48 Hours: Clean up Scoreboard message / channel
+      if (elapsed >= MS_48_HOURS && !t.scoreboard_cleaned_48h) {
+        console.log(`[AutoCleanup] 48 Hours elapsed for Tournament #${t.id} (${t.title}). Cleaning scoreboard showcase...`);
+        const scoreChanId = t.scores_channel_id || t.scoreboard_channel_id;
+        if (scoreChanId) {
+          try {
+            const scoreChan = await client.channels.fetch(scoreChanId).catch(() => null);
+            if (scoreChan) {
+              if (t.scoreboard_message_id) {
+                const sMsg = await scoreChan.messages.fetch(t.scoreboard_message_id).catch(() => null);
+                if (sMsg) await sMsg.delete().catch(() => null);
+              }
+            }
+          } catch (scoreErr) {
+            console.warn(`[AutoCleanup] Error cleaning scoreboard for Tournament #${t.id}:`, scoreErr.message);
+          }
+        }
+
+        dbQueries.updateTournament(t.id, { scoreboard_cleaned_48h: true });
+        console.log(`[AutoCleanup] ✅ 48h scoreboard showcase expired and cleaned for Tournament #${t.id}.`);
+      }
+    }
   }
 };
 

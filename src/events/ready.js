@@ -41,5 +41,16 @@ module.exports = {
         console.error(`[Ready] Error ensuring pick-your-games for ${guild.name}:`, err.message);
       });
     }
+
+    // Schedule background check for closed tournaments:
+    // - Purges messages 24 hours after tournament close (retaining scoreboard)
+    // - Cleans up scoreboard 48 hours after tournament close
+    const tournamentHandler = require('../handlers/tournamentHandler');
+    tournamentHandler.processClosedTournamentsCleanup(client).catch(() => null);
+    setInterval(() => {
+      tournamentHandler.processClosedTournamentsCleanup(client).catch(err => {
+        console.warn('[AutoCleanup] Error in periodic cleanup cycle:', err.message);
+      });
+    }, 15 * 60 * 1000); // Check every 15 minutes
   }
 };

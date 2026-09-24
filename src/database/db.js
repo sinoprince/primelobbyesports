@@ -164,6 +164,7 @@ const dbQueries = {
     const tournament = data.tournaments.find(t => t.id === Number(id));
     if (tournament) {
       tournament.status = status;
+      tournament.closed_at = new Date().toISOString();
       saveDatabase();
     }
     return tournament;
