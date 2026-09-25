@@ -50,7 +50,6 @@
         <button class="nav-tab" onclick="switchTab('scoreboard')">📊 Match Scoreboard</button>
         <button class="nav-tab" onclick="switchTab('tickets')">🎫 Support Tickets</button>
         <button class="nav-tab" onclick="switchTab('announcements')">📢 Announcements</button>
-        <button class="nav-tab" onclick="switchTab('server-setup')">⚙️ Server Setup</button>
       </nav>
 
       <div class="nav-actions">
@@ -405,69 +404,6 @@
 
             <button type="submit" id="btnSendAnnouncement" class="btn btn-primary">🚀 Broadcast Announcement to Discord</button>
           </form>
-        </div>
-      </section>
-
-      <!-- TAB 7: Server Layout & Bot Control -->
-      <section id="tab-server-setup" class="tab-pane">
-        <div class="pane-header">
-          <div>
-            <h2>⚙️ Server Setup & Discord Infrastructure</h2>
-            <p>Deploy rules panels, support ticket desks, payment panels, and game categories directly to Discord.</p>
-          </div>
-        </div>
-
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px;">
-          <!-- Setup All Card -->
-          <div class="tourney-card">
-            <div class="card-header">
-              <h3 class="card-title">🚀 Complete Clean Rebuild / Setup</h3>
-              <span class="badge badge-open">Full Suite</span>
-            </div>
-            <p class="text-sm text-muted" style="margin: 12px 0;">
-              Automatically verifies and builds Visitor/Member roles, Information category, Rules & Verification panel, 4 Game Categories (PUBG, Valorant, Free Fire, eFootball), Community chat/voice, Support Ticket desk, and Scan-to-Pay Payment Desk.
-            </p>
-            <div style="display: flex; gap: 10px; margin-top: 15px;">
-              <button class="btn btn-primary flex-1" onclick="runServerSetup('all', false)">⚡ Run Full Setup</button>
-              <button class="btn btn-danger-outline flex-1" onclick="runServerSetup('all', true)">🧹 Clean & Rebuild</button>
-            </div>
-          </div>
-
-          <!-- Game Hubs & Roles -->
-          <div class="tourney-card">
-            <div class="card-header">
-              <h3 class="card-title">🎮 4 Game Hubs & Roles</h3>
-              <span class="badge badge-started">Game Hubs</span>
-            </div>
-            <p class="text-sm text-muted" style="margin: 12px 0;">
-              Creates role-locked categories for PUBG, Valorant, Free Fire, and eFootball, along with the interactive dropdown in <code>#🎮-pick-your-games</code>.
-            </p>
-            <button class="btn btn-success btn-block" style="margin-top: 15px;" onclick="runServerSetup('games')">🎮 Deploy Game Hubs & Selector</button>
-          </div>
-
-          <!-- Rules & Member Verification -->
-          <div class="tourney-card">
-            <div class="card-header">
-              <h3 class="card-title">📜 Rules & Verification Desk</h3>
-              <span class="badge badge-open">Security</span>
-            </div>
-            <p class="text-sm text-muted" style="margin: 12px 0;">
-              Posts the interactive rules embed with the <strong>"Verify / Accept Rules"</strong> button. Unlocks the server for new members.
-            </p>
-            <button class="btn btn-info btn-block" style="margin-top: 15px;" onclick="runServerSetup('rules')">📜 Deploy Rules Embed</button>
-          </div>
-
-          <!-- Support Tickets Desk -->
-          <div class="tourney-card">
-            <div class="card-header">
-              <h3 class="card-title">🎫 Support Ticket Desk</h3>
-              <span class="badge badge-started">Helpdesk</span>
-            </div>
-            <p class="text-sm text-muted" style="margin: 12px 0;">
-              Deploys the <code>#🎫-support-helpdesk</code> button embed for members to open private 1-on-1 staff tickets and support channels.
-            </p>
-            <button class="btn btn-outline btn-block" style="margin-top: 15px;" onclick="runServerSetup('tickets')">🎫 Deploy Ticket Desk</button>
-          </div>
         </div>
       </section>
 

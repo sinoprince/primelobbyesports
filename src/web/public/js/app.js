@@ -1149,30 +1149,5 @@ async function handleSendAnnouncement(e) {
   }
 }
 
-// --- TAB 7: Server Setup Handler ---
-async function runServerSetup(type = 'all', cleanRebuild = false) {
-  const confirmMsg = cleanRebuild 
-    ? '⚠️ Are you sure you want to run Clean & Rebuild? This will clean obsolete categories and freshly rebuild channels.'
-    : `Run ${type.toUpperCase()} setup on your Discord Server?`;
 
-  if (!confirm(confirmMsg)) return;
-
-  showToast(`⏳ Deploying ${type.toUpperCase()} configuration to Discord... Please wait.`, 'info');
-
-  try {
-    const res = await apiFetch('/api/setup', {
-      method: 'POST',
-      body: JSON.stringify({ type, cleanRebuild })
-    });
-
-    if (res && res.success) {
-      showToast(res.message || 'Server layout and channels deployed successfully!', 'success');
-      loadChannels();
-    } else {
-      showToast(res ? res.message : 'Server setup encountered an issue.', 'danger');
-    }
-  } catch (err) {
-    showToast('Failed to trigger server setup.', 'danger');
-  }
-}
 

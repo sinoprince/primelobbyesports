@@ -281,23 +281,29 @@ const tournamentHandler = {
         });
       }
 
-      // 6. Voice Lounge Channel for participants
-      let voiceLounge = guild.channels.cache.find(c => 
-        c.type === ChannelType.GuildVoice && (
-          (category && c.parentId === category.id && (c.name.includes('lounge') || (gameDef && c.name === gameDef.voiceChannel)))
-        )
-      );
+      // 6. Voice Channels: Dedicated Team Voice Lounges & Match Room
+      const voiceChannelIds = [];
+      const numTeamVoiceRooms = mode === 'squad' ? 6 : (mode === 'duo' ? 4 : 2);
 
-      if (!voiceLounge) {
-        voiceLounge = await guild.channels.create({
-          name: `🔊 tournament-lounge`,
+      let voiceLounge = await guild.channels.create({
+        name: `🔊 Tournament Lounge`,
+        type: ChannelType.GuildVoice,
+        parent: category.id,
+        permissionOverwrites: participantOverwrites
+      }).catch(() => null);
+
+      if (voiceLounge) voiceChannelIds.push(voiceLounge.id);
+
+      for (let i = 1; i <= numTeamVoiceRooms; i++) {
+        const teamVoice = await guild.channels.create({
+          name: `🔊 Team ${i} Voice`,
           type: ChannelType.GuildVoice,
           parent: category.id,
+          userLimit: mode === 'squad' ? 4 : (mode === 'duo' ? 2 : 5),
           permissionOverwrites: participantOverwrites
-        });
+        }).catch(() => null);
+        if (teamVoice) voiceChannelIds.push(teamVoice.id);
       }
-
-      const voiceChannelIds = [voiceLounge.id];
 
 
       // 7. Save to Database
@@ -1055,26 +1061,59 @@ const tournamentHandler = {
         console.log(`[AutoCleanup] ✅ 24h message purge finished for Tournament #${t.id}. Scoreboard remains active for podium showcase.`);
       }
 
-      // 2. After 48 Hours: Clean up Scoreboard message / channel
-      if (elapsed >= MS_48_HOURS && !t.scoreboard_cleaned_48h) {
-        console.log(`[AutoCleanup] 48 Hours elapsed for Tournament #${t.id} (${t.title}). Cleaning scoreboard showcase...`);
-        const scoreChanId = t.scores_channel_id || t.scoreboard_channel_id;
-        if (scoreChanId) {
+      // 2. After 48 Hours: Clean up Scoreboard, all associated channels, and roles
+      if (elapsed >= MS_48_HOURS && !t.channels_and_roles_cleaned_48h) {
+        console.log(`[AutoCleanup] 48 Hours elapsed for Tournament #${t.id} (${t.title}). Automatically deleting all associated channels and roles...`);
+
+        // A. Delete all associated tournament channels (chat, announcements, voice channels, and scoreboard)
+        const channelsToDelete = [
+          t.chat_channel_id,
+          t.announcements_channel_id,
+          t.scores_channel_id,
+          t.scoreboard_channel_id,
+          ...(t.voice_channel_ids || [])
+        ].filter(Boolean);
+
+        for (const chId of channelsToDelete) {
           try {
-            const scoreChan = await client.channels.fetch(scoreChanId).catch(() => null);
-            if (scoreChan) {
-              if (t.scoreboard_message_id) {
-                const sMsg = await scoreChan.messages.fetch(t.scoreboard_message_id).catch(() => null);
-                if (sMsg) await sMsg.delete().catch(() => null);
-              }
+            const chan = await client.channels.fetch(chId).catch(() => null);
+            if (chan) {
+              await chan.delete('48 hours post-tournament conclusion auto-cleanup').catch(() => null);
+              console.log(`[AutoCleanup] Deleted channel: ${chan.name} (${chan.id})`);
             }
-          } catch (scoreErr) {
-            console.warn(`[AutoCleanup] Error cleaning scoreboard for Tournament #${t.id}:`, scoreErr.message);
+          } catch (cErr) {
+            console.warn(`[AutoCleanup] Error deleting channel ${chId}:`, cErr.message);
           }
         }
 
-        dbQueries.updateTournament(t.id, { scoreboard_cleaned_48h: true });
-        console.log(`[AutoCleanup] ✅ 48h scoreboard showcase expired and cleaned for Tournament #${t.id}.`);
+        // B. Delete associated tournament roles if not already deleted
+        try {
+          const guild = client.guilds.cache.get(t.guild_id) || client.guilds.cache.first();
+          if (guild) {
+            await guild.roles.fetch().catch(() => null);
+
+            if (t.tournament_role_id) {
+              const role = guild.roles.cache.get(t.tournament_role_id);
+              if (role) {
+                await role.delete('48 hours post-tournament conclusion auto-cleanup').catch(() => null);
+                console.log(`[AutoCleanup] Deleted tournament role: ${role.name} (${role.id})`);
+              }
+            }
+
+            if (t.pending_role_id) {
+              const pRole = guild.roles.cache.get(t.pending_role_id);
+              if (pRole) {
+                await pRole.delete('48 hours post-tournament conclusion auto-cleanup').catch(() => null);
+                console.log(`[AutoCleanup] Deleted pending role: ${pRole.name} (${pRole.id})`);
+              }
+            }
+          }
+        } catch (rErr) {
+          console.warn(`[AutoCleanup] Error deleting roles for tournament #${t.id}:`, rErr.message);
+        }
+
+        dbQueries.updateTournament(t.id, { scoreboard_cleaned_48h: true, channels_and_roles_cleaned_48h: true });
+        console.log(`[AutoCleanup] ✅ 48h full auto-cleanup complete for Tournament #${t.id} (All roles and channels deleted).`);
       }
     }
   }
