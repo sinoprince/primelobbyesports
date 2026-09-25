@@ -28,6 +28,14 @@ function checkAdminAuth(req, res, next) {
   next();
 }
 
+// 0. Lightweight Health Check Endpoints (for UptimeRobot / Cron pings)
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+app.get('/ping', (req, res) => {
+  res.status(200).send('pong');
+});
+
 // 1. Auth Endpoint
 app.post('/api/auth/login', (req, res) => {
   const pin = req.body.pin || req.body.secret || req.body.password;
