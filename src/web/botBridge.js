@@ -394,6 +394,14 @@ const botBridge = {
   },
 
   /**
+   * Deletes a match record and refreshes the live scoreboard in Discord.
+   */
+  deleteScoreboardEntry: async (tournamentId, entryId) => {
+    const client = await botBridge.getClient();
+    return await tournamentHandler.deleteScoreboardEntry(client, tournamentId, entryId);
+  },
+
+  /**
    * Sends an official announcement to any Discord channel from the web panel.
    */
   sendAnnouncement: async ({ channelId, title, message, ping = 'none', color = '#FFA500', imageUrl = null }) => {

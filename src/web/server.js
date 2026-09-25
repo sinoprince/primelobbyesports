@@ -252,7 +252,23 @@ app.post('/api/tournaments/:id/update-participant-status', checkAdminAuth, async
   }
 });
 
-// 6. Scoreboard Submit Endpoint
+// 6. Scoreboard Endpoints
+app.get('/api/tournaments/:id/scoreboard', checkAdminAuth, (req, res) => {
+  try {
+    const tournamentId = parseInt(req.params.id, 10);
+    const storage = JSON.parse(fs.readFileSync(path.join(__dirname, '../../data/storage.json'), 'utf-8'));
+    const tourney = (storage.tournaments || []).find(t => t.id === tournamentId) || null;
+    const entries = (storage.scoreboard_entries || []).filter(e => e.tournament_id === tournamentId);
+    res.json({
+      success: true,
+      tournament: tourney,
+      entries
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 app.post('/api/tournaments/:id/score', checkAdminAuth, async (req, res) => {
   try {
     const tournamentId = parseInt(req.params.id, 10);
@@ -268,6 +284,18 @@ app.post('/api/tournaments/:id/score', checkAdminAuth, async (req, res) => {
 
     const result = await botBridge.updateScoreboard(tournamentId, round, player1, player2, score, winner);
     res.json({ success: true, message: result.message });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.delete('/api/tournaments/:id/score/:entryId', checkAdminAuth, async (req, res) => {
+  try {
+    const tournamentId = parseInt(req.params.id, 10);
+    const entryId = parseInt(req.params.entryId, 10);
+    const result = await botBridge.deleteScoreboardEntry(tournamentId, entryId);
+    if (!result.success) return res.status(400).json(result);
+    res.json(result);
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

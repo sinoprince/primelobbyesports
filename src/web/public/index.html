@@ -209,51 +209,115 @@
       <section id="tab-scoreboard" class="tab-pane">
         <div class="pane-header">
           <div>
-            <h2>📊 Live Scoreboard & Standings Broadcaster</h2>
-            <p>Submit round results, points, and kills. Syncs directly with Discord <code>#📊-scoreboard</code>.</p>
+            <h2>📊 Live Scoreboard & Esports Match Center</h2>
+            <p>Record match results, calculate standings, and sync directly with Discord <code>#📊-scoreboard</code> & announcements.</p>
+          </div>
+          <div style="display: flex; gap: 10px; align-items: center;">
+            <div class="select-wrapper">
+              <select id="scoreTourneySelect" onchange="handleScoreTourneyChange()">
+                <option value="">Select Tournament...</option>
+              </select>
+            </div>
+            <button class="btn btn-sm btn-outline" onclick="loadScoreboardTab()">🔄 Refresh Scores</button>
           </div>
         </div>
 
-        <div class="scoreboard-form-card">
-          <h3>Record Match Result & Update Discord</h3>
-          <form id="scoreForm" onsubmit="handleScoreSubmit(event)">
-            <div class="form-row">
-              <div class="form-group flex-1">
-                <label>Tournament</label>
-                <select id="scoreTourneySelect" required>
-                  <option value="">Select Tournament...</option>
-                </select>
-              </div>
-              <div class="form-group flex-1">
-                <label>Match / Round Name</label>
-                <input type="text" id="scoreRound" placeholder="e.g. Map 1: Erangel or Quarterfinals" required>
+        <!-- Tournament Overview Banner in Scoreboard -->
+        <div id="scoreTourneyBanner" class="score-tourney-banner hidden">
+          <div class="score-banner-info">
+            <span id="scoreTourneyGame" class="game-tag">Game</span>
+            <h3 id="scoreTourneyTitle" class="score-banner-title">Tournament Title</h3>
+            <div id="scoreTourneyMeta" class="score-banner-meta">Format • Channel</div>
+          </div>
+          <div class="score-banner-stats">
+            <div class="score-stat-box">
+              <span class="score-stat-num" id="scoreStatMatches">0</span>
+              <span class="score-stat-lbl">Matches Logged</span>
+            </div>
+            <div class="score-stat-box">
+              <span class="score-stat-num" id="scoreStatTeams">0</span>
+              <span class="score-stat-lbl">Teams Active</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="scoreboard-layout-grid">
+          <!-- Column 1: Record Match Form -->
+          <div class="scoreboard-form-card">
+            <div class="card-header" style="margin-bottom: 15px;">
+              <h3 style="margin: 0; font-size: 1.2rem; color: #fff;">⚔️ Post Match Result</h3>
+              <span class="badge badge-open">Live Discord Sync</span>
+            </div>
+
+            <!-- Quick Format Round Presets -->
+            <div style="margin-bottom: 16px;">
+              <label style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Quick Round Presets</label>
+              <div class="preset-buttons" style="margin-top: 6px;">
+                <button type="button" class="preset-btn" onclick="applyScorePreset('Map 1: Erangel')">🗺️ Erangel</button>
+                <button type="button" class="preset-btn" onclick="applyScorePreset('Map 2: Miramar')">🗺️ Miramar</button>
+                <button type="button" class="preset-btn" onclick="applyScorePreset('Map 3: Sanhok')">🗺️ Sanhok</button>
+                <button type="button" class="preset-btn" onclick="applyScorePreset('Round 1 (Upper)')">⚔️ Round 1</button>
+                <button type="button" class="preset-btn" onclick="applyScorePreset('Round 2 (Lower)')">⚔️ Round 2</button>
+                <button type="button" class="preset-btn" onclick="applyScorePreset('Grand Finals')">🏆 Finals</button>
               </div>
             </div>
 
-            <div class="form-row">
-              <div class="form-group flex-1">
-                <label>Team 1 / Player 1</label>
-                <input type="text" id="scoreP1" placeholder="e.g. Team Titans (Leader: Slayer)" required>
+            <form id="scoreForm" onsubmit="handleScoreSubmit(event)">
+              <div class="form-group">
+                <label>Match / Round / Map Name</label>
+                <input type="text" id="scoreRound" placeholder="e.g. Map 1: Erangel or Quarterfinals Match 1" required>
               </div>
-              <div class="form-group flex-1">
-                <label>Team 2 / Player 2 (Optional for Battle Royale)</label>
-                <input type="text" id="scoreP2" placeholder="e.g. Shadow Squad or N/A">
+
+              <div class="form-row">
+                <div class="form-group flex-1">
+                  <label id="lblScoreP1">Team 1 / Player 1</label>
+                  <input type="text" id="scoreP1" list="teamNamesList" placeholder="e.g. Team Alpha or Player IGN" required>
+                </div>
+                <div class="form-group flex-1">
+                  <label id="lblScoreP2">Team 2 / Player 2 (Optional for BR)</label>
+                  <input type="text" id="scoreP2" list="teamNamesList" placeholder="e.g. Team Bravo or N/A">
+                </div>
               </div>
+              <datalist id="teamNamesList"></datalist>
+
+              <div class="form-row">
+                <div class="form-group flex-1">
+                  <label>Score / Points / Kills Result</label>
+                  <input type="text" id="scoreResult" placeholder="e.g. 15 Kills (WWCD) or 13 - 9 or 3 - 1" required>
+                </div>
+                <div class="form-group flex-1">
+                  <label>Round Winner / Top Team</label>
+                  <input type="text" id="scoreWinner" list="teamNamesList" placeholder="e.g. Team Alpha" required>
+                </div>
+              </div>
+
+              <!-- Quick Winner Selector buttons populated dynamically -->
+              <div id="quickWinnerButtons" class="quick-winner-row hidden">
+                <span style="font-size: 0.8rem; color: var(--text-muted); align-self: center;">Quick Pick Winner:</span>
+                <button type="button" class="btn btn-xs btn-outline" id="btnPickP1" onclick="setWinnerFromP1()"></button>
+                <button type="button" class="btn btn-xs btn-outline" id="btnPickP2" onclick="setWinnerFromP2()"></button>
+              </div>
+
+              <button type="submit" id="btnSubmitScore" class="btn btn-primary btn-block" style="margin-top: 15px;">
+                📢 Broadcast Score to Discord #📊-scoreboard
+              </button>
+            </form>
+          </div>
+
+          <!-- Column 2: Live Standings & Logged Matches List -->
+          <div class="scoreboard-results-card">
+            <div class="card-header" style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+              <h3 style="margin: 0; font-size: 1.2rem; color: #fff;">🏆 Recorded Matches & Standings</h3>
+              <span id="scoreEntriesCount" class="badge badge-started">0 Matches</span>
             </div>
 
-            <div class="form-row">
-              <div class="form-group flex-1">
-                <label>Score / Points / Kills Result</label>
-                <input type="text" id="scoreResult" placeholder="e.g. 15 Kills (Winner: WWCD) or 3 - 1" required>
-              </div>
-              <div class="form-group flex-1">
-                <label>Round Winner</label>
-                <input type="text" id="scoreWinner" placeholder="e.g. Team Titans" required>
+            <!-- Real-time matches feed -->
+            <div id="scoreboardEntriesList" class="scoreboard-feed">
+              <div class="empty-state" style="padding: 30px;">
+                Select a tournament above to inspect recorded fixtures and live leaderboard standings.
               </div>
             </div>
-
-            <button type="submit" class="btn btn-primary">📢 Broadcast Score to Discord #📊-scoreboard</button>
-          </form>
+          </div>
         </div>
       </section>
 

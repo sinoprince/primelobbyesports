@@ -840,18 +840,211 @@ function closeScreenshotModal() {
   document.getElementById('previewImage').src = '';
 }
 
-// --- TAB 4: Scoreboard Submission ---
+// --- TAB 4: Esports Scoreboard Manager ---
+let cachedScoreboardEntries = [];
+
 function loadScoreboardTab() {
   populateTournamentDropdowns();
+  const select = document.getElementById('scoreTourneySelect');
+  if (select && select.value) {
+    handleScoreTourneyChange();
+  } else if (select && select.options.length > 1) {
+    select.selectedIndex = 1;
+    handleScoreTourneyChange();
+  }
+}
+
+async function handleScoreTourneyChange() {
+  const tourneyId = document.getElementById('scoreTourneySelect').value;
+  const banner = document.getElementById('scoreTourneyBanner');
+  const feed = document.getElementById('scoreboardEntriesList');
+  const countBadge = document.getElementById('scoreEntriesCount');
+  const teamDatalist = document.getElementById('teamNamesList');
+  const quickPickRow = document.getElementById('quickWinnerButtons');
+
+  if (!tourneyId) {
+    if (banner) banner.classList.add('hidden');
+    if (feed) feed.innerHTML = '<div class="empty-state" style="padding: 30px;">Select a tournament above to inspect recorded fixtures and live leaderboard standings.</div>';
+    if (countBadge) countBadge.innerText = '0 Matches';
+    if (quickPickRow) quickPickRow.classList.add('hidden');
+    return;
+  }
+
+  // Fetch Tournament Scoreboard & Participants
+  const [scoreData, partData] = await Promise.all([
+    apiFetch(`/api/tournaments/${tourneyId}/scoreboard`),
+    apiFetch(`/api/tournaments/${tourneyId}/participants`)
+  ]);
+
+  const tourney = (scoreData && scoreData.tournament) || cachedTournaments.find(t => String(t.id) === String(tourneyId));
+  const entries = (scoreData && scoreData.entries) || [];
+  cachedScoreboardEntries = entries;
+  const participants = (partData && partData.participants) || [];
+
+  // Update Overview Banner
+  if (banner && tourney) {
+    banner.classList.remove('hidden');
+    document.getElementById('scoreTourneyGame').innerText = tourney.game || 'Esports';
+    document.getElementById('scoreTourneyTitle').innerText = tourney.title || tourney.name || `Tournament #${tourneyId}`;
+    document.getElementById('scoreTourneyMeta').innerText = `Format: ${(tourney.formatMode || tourney.mode || 'Custom').toUpperCase()} • Channel: #${tourney.channel_id || tourney.dashboard_channel_id || 'active-tournaments'}`;
+    document.getElementById('scoreStatMatches').innerText = entries.length;
+    document.getElementById('scoreStatTeams').innerText = participants.length;
+  }
+
+  // Update Matches Count Badge
+  if (countBadge) {
+    countBadge.innerText = `${entries.length} ${entries.length === 1 ? 'Match' : 'Matches'}`;
+  }
+
+  // Populate Teams Datalist for fast autocomplete
+  if (teamDatalist) {
+    const teamOptions = participants.map(p => {
+      const name = p.teamName || p.squad_name || p.username || p.ign;
+      return `<option value="${escapeHtml(name)}">${escapeHtml(name)} (IGN: ${escapeHtml(p.ign || 'N/A')})</option>`;
+    }).join('');
+    teamDatalist.innerHTML = teamOptions;
+  }
+
+  // Hook input listeners for Quick Winner selector
+  setupQuickWinnerListeners();
+
+  // Render Logged Matches Feed
+  renderScoreboardEntries(entries, tourneyId);
+}
+
+function setupQuickWinnerListeners() {
+  const p1Input = document.getElementById('scoreP1');
+  const p2Input = document.getElementById('scoreP2');
+  const quickRow = document.getElementById('quickWinnerButtons');
+  const btnP1 = document.getElementById('btnPickP1');
+  const btnP2 = document.getElementById('btnPickP2');
+
+  function updateQuickPicks() {
+    const val1 = p1Input.value.trim();
+    const val2 = p2Input.value.trim();
+
+    if (val1 || val2) {
+      quickRow.classList.remove('hidden');
+      if (val1) {
+        btnP1.innerText = `🏆 ${val1}`;
+        btnP1.style.display = 'inline-block';
+      } else {
+        btnP1.style.display = 'none';
+      }
+
+      if (val2 && val2 !== 'N/A') {
+        btnP2.innerText = `🏆 ${val2}`;
+        btnP2.style.display = 'inline-block';
+      } else {
+        btnP2.style.display = 'none';
+      }
+    } else {
+      quickRow.classList.add('hidden');
+    }
+  }
+
+  p1Input.oninput = updateQuickPicks;
+  p2Input.oninput = updateQuickPicks;
+}
+
+function setWinnerFromP1() {
+  const p1 = document.getElementById('scoreP1').value.trim();
+  if (p1) document.getElementById('scoreWinner').value = p1;
+}
+
+function setWinnerFromP2() {
+  const p2 = document.getElementById('scoreP2').value.trim();
+  if (p2) document.getElementById('scoreWinner').value = p2;
+}
+
+function applyScorePreset(presetName) {
+  const roundInput = document.getElementById('scoreRound');
+  if (roundInput) {
+    roundInput.value = presetName;
+    roundInput.focus();
+  }
+}
+
+function renderScoreboardEntries(entries, tourneyId) {
+  const feed = document.getElementById('scoreboardEntriesList');
+  if (!feed) return;
+
+  if (!entries || entries.length === 0) {
+    feed.innerHTML = `
+      <div class="empty-state" style="padding: 30px;">
+        <span style="font-size: 2rem; display: block; margin-bottom: 8px;">⚔️</span>
+        No matches recorded yet for this tournament.<br>
+        <span class="text-muted text-sm">Use the form on the left to broadcast your first round result to Discord.</span>
+      </div>
+    `;
+    return;
+  }
+
+  const reversed = [...entries].reverse();
+  feed.innerHTML = reversed.map((m, idx) => {
+    const timeFormatted = m.created_at ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Live';
+    const isSingleParticipant = !m.player2 || m.player2 === 'N/A' || m.player2 === '';
+
+    return `
+      <div class="score-match-card">
+        <div class="score-match-header">
+          <span class="score-round-title">📌 ${escapeHtml(m.round_name)}</span>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <span class="text-muted text-sm">${timeFormatted}</span>
+            <button class="btn-delete-match" onclick="handleDeleteScoreEntry('${tourneyId}', '${m.id}')" title="Delete record & refresh Discord">✕ Delete</button>
+          </div>
+        </div>
+
+        <div class="score-match-body">
+          <div class="score-vs-teams">
+            ${isSingleParticipant ? `
+              <span class="text-info">${escapeHtml(m.player1)}</span>
+            ` : `
+              <span class="${m.winner === m.player1 ? 'text-success' : ''}">${escapeHtml(m.player1)}</span>
+              <span class="text-muted" style="margin: 0 6px; font-weight: normal;">vs</span>
+              <span class="${m.winner === m.player2 ? 'text-success' : ''}">${escapeHtml(m.player2)}</span>
+            `}
+          </div>
+          <span class="score-badge-result">${escapeHtml(m.score)}</span>
+        </div>
+
+        <div class="score-match-winner">
+          <span>🏆 <strong>Winner / Top:</strong> ${escapeHtml(m.winner || m.player1)}</span>
+          <span class="text-muted text-sm">Discord Synced ●</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function handleDeleteScoreEntry(tourneyId, entryId) {
+  if (!confirm('Are you sure you want to delete this match record? This will also update the Discord live scoreboard.')) {
+    return;
+  }
+
+  const res = await apiFetch(`/api/tournaments/${tourneyId}/score/${entryId}`, {
+    method: 'DELETE'
+  });
+
+  if (res && res.success) {
+    showToast('Match record deleted & live Discord scoreboard updated!', 'success');
+    handleScoreTourneyChange();
+  } else {
+    showToast(res ? res.message : 'Failed to delete score entry', 'danger');
+  }
 }
 
 async function handleScoreSubmit(e) {
   e.preventDefault();
   const tourneyId = document.getElementById('scoreTourneySelect').value;
   if (!tourneyId) {
-    alert('Please select a tournament');
+    showToast('Please select a tournament from the dropdown', 'warning');
     return;
   }
+
+  const btn = document.getElementById('btnSubmitScore');
+  btn.disabled = true;
+  btn.innerText = '⏳ Syncing to Discord #📊-scoreboard...';
 
   const payload = {
     round: document.getElementById('scoreRound').value.trim(),
@@ -861,16 +1054,25 @@ async function handleScoreSubmit(e) {
     winner: document.getElementById('scoreWinner').value.trim()
   };
 
-  const res = await apiFetch(`/api/tournaments/${tourneyId}/score`, {
-    method: 'POST',
-    body: JSON.stringify(payload)
-  });
+  try {
+    const res = await apiFetch(`/api/tournaments/${tourneyId}/score`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
 
-  if (res && res.success) {
-    showToast('Match result submitted and broadcasted to Discord #📊-scoreboard!', 'success');
-    document.getElementById('scoreForm').reset();
-  } else {
-    showToast(res ? res.error : 'Failed to broadcast scoreboard', 'danger');
+    if (res && res.success) {
+      showToast('Match result submitted and broadcasted to Discord #📊-scoreboard!', 'success');
+      document.getElementById('scoreRound').value = '';
+      document.getElementById('scoreResult').value = '';
+      handleScoreTourneyChange();
+    } else {
+      showToast(res ? res.message || res.error : 'Failed to broadcast scoreboard', 'danger');
+    }
+  } catch (err) {
+    showToast('Network error updating scoreboard', 'danger');
+  } finally {
+    btn.disabled = false;
+    btn.innerText = '📢 Broadcast Score to Discord #📊-scoreboard';
   }
 }
 

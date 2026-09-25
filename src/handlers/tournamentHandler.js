@@ -682,6 +682,22 @@ const tournamentHandler = {
   },
 
   /**
+   * Deletes a match record and refreshes the live scoreboard in Discord.
+   */
+  deleteScoreboardEntry: async (client, tournamentId, entryId) => {
+    try {
+      const deleted = dbQueries.deleteScoreboardEntry(entryId);
+      if (!deleted) return { success: false, message: 'Scoreboard entry not found.' };
+
+      await tournamentHandler.refreshTournamentScoreboard(client, tournamentId);
+      return { success: true, message: 'Scoreboard entry removed and Discord scoreboard updated!' };
+    } catch (err) {
+      console.error('[ScoreboardManager] Error removing entry:', err);
+      return { success: false, message: err.message };
+    }
+  },
+
+  /**
    * Refreshes the persistent live scoreboard & bracket embed in #📊-scoreboard.
    */
   refreshTournamentScoreboard: async (client, tournamentId) => {

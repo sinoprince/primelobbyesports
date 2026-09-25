@@ -293,6 +293,15 @@ const dbQueries = {
     return data.scoreboard_entries.filter(e => e.tournament_id === tId);
   },
 
+  deleteScoreboardEntry: (entryId) => {
+    const data = loadDatabase();
+    const eId = Number(entryId);
+    const initial = data.scoreboard_entries.length;
+    data.scoreboard_entries = data.scoreboard_entries.filter(e => e.id !== eId);
+    saveDatabase();
+    return data.scoreboard_entries.length < initial;
+  },
+
 
   // Payment System & Ledger
   createPayment: (paymentData) => {
