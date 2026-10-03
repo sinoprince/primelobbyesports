@@ -7,9 +7,9 @@ module.exports = {
   async execute(client) {
     console.log(`[Bot] Logged in as ${client.user.tag} (${client.user.id})`);
 
-    // Set custom activity status
+    // Set custom activity status: Tournament Manager for PUBG Mobile & Valorant
     client.user.setPresence({
-      activities: [{ name: '🏆 Tournaments & 🎫 Support', type: ActivityType.Watching }],
+      activities: [{ name: '🎮 PUBG & Valorant • TournaLink PCOB Live', type: ActivityType.Watching }],
       status: 'online'
     });
 

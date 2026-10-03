@@ -42,10 +42,6 @@ client.commands = new Collection();
 function loadCommands(dir) {
   const files = fs.readdirSync(dir, { withFileTypes: true });
   for (const file of files) {
-    // If dedicated Payment Bot is active, Main Bot only handles community, tournaments, tickets, and setup
-    if (file.isDirectory() && file.name === 'payments' && process.env.PAYMENT_BOT_TOKEN) {
-      continue;
-    }
     const fullPath = path.join(dir, file.name);
     if (file.isDirectory()) {
       loadCommands(fullPath);

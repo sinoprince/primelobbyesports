@@ -53,15 +53,18 @@ const paymentBotService = {
     return paymentClient;
   },
 
-  /**
-   * Sends a Direct Message to a user explicitly using the Payment Bot.
-   * @param {string} userId - The Discord user ID.
-   * @param {object} payload - Message options (embeds, components, files, content).
-   * @param {Client} [fallbackClient] - Main bot client if Payment Bot is unavailable.
-   * @returns {Promise<{ success: boolean, message?: any, error?: string, code?: number, sender?: string }>}
-   */
   sendDm: async (userId, payload, fallbackClient = null) => {
     try {
+      // 1. In Single-Bot mode or if fallbackClient provided, send directly from Prime Lobby Esports #8842
+      if (fallbackClient && fallbackClient.isReady()) {
+        const user = await fallbackClient.users.fetch(userId).catch(() => null);
+        if (user) {
+          const sent = await user.send(payload);
+          console.log(`[BotService] Sent DM via Prime Lobby Esports (${fallbackClient.user?.tag || 'Bot'}) to ${userId}`);
+          return { success: true, message: sent, sender: fallbackClient.user?.tag || 'Prime Lobby Esports' };
+        }
+      }
+
       const client = paymentBotService.getClient();
 
       // Wait a short moment if client is currently logging in

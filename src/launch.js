@@ -3,7 +3,7 @@ const { fork } = require('child_process');
 const path = require('path');
 
 console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-console.log('🚀 Launching Prime Lobby Esports Dual-Bot System');
+console.log('🚀 Launching Prime Lobby Esports #8842 Unified Tournament & Broadcast Bot');
 console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
 let isShuttingDown = false;
@@ -38,16 +38,11 @@ function spawnManagedProcess(name, scriptPath, restartDelay = 3000) {
   };
 }
 
-// 1. Launch Main Community & Tournament Bot
-const mainBot = spawnManagedProcess('MainBot', path.join(__dirname, 'index.js'));
+// 1. Launch Unified Prime Lobby Esports Bot (#8842)
+const mainBot = spawnManagedProcess('PrimeLobbyBot', path.join(__dirname, 'index.js'));
 
-// 2. Launch Dedicated Payment Bot (Prime Pay)
+// Single Bot Architecture: All payments, tournament management, and verification are unified into Prime Lobby Esports #8842
 let payBot = null;
-if (process.env.PAYMENT_BOT_TOKEN) {
-  payBot = spawnManagedProcess('PaymentBot', path.join(__dirname, '../payment-bot/src/index.js'));
-} else {
-  console.log('ℹ️ PAYMENT_BOT_TOKEN not found. Running payment features inside Main Bot.');
-}
 
 // 3. Launch Web Tournament Management Software
 const webServer = spawnManagedProcess('WebServer', path.join(__dirname, 'web/server.js'));

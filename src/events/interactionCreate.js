@@ -24,13 +24,7 @@ module.exports = {
   async execute(interaction, clientInstance = null) {
     const client = clientInstance || interaction.client;
 
-    const isPaymentBot = Boolean(
-      process.env.PAYMENT_CLIENT_ID && client.user && (
-        client.user.id === process.env.PAYMENT_CLIENT_ID ||
-        client.user.id === '1551987536925032569'
-      )
-    );
-
+    // Single Bot Architecture: Prime Lobby Esports handles all tournament, payment, role, and ticket interactions!
     const isPaymentInteraction = 
       (interaction.isChatInputCommand() && ['pay', 'pay-admin'].includes(interaction.commandName)) ||
       (interaction.isButton() && (
@@ -45,18 +39,6 @@ module.exports = {
         interaction.customId === 'modal_submit_payment_proof' ||
         interaction.customId === 'modal_generate_custom_qr'
       ));
-
-    // Strict Bot Duty Separation:
-    if (process.env.PAYMENT_BOT_TOKEN) {
-      if (isPaymentBot && !isPaymentInteraction) {
-        // Payment Bot only does payment things
-        return;
-      }
-      if (!isPaymentBot && isPaymentInteraction) {
-        // Main Bot only does other things (non-payment)
-        return;
-      }
-    }
 
     // 1. Handle Slash Commands
     if (interaction.isChatInputCommand()) {
