@@ -127,6 +127,8 @@ const botBridge = {
       rulesText: data.rules_text || '',
       scheduleDate: data.schedule_date || null,
       scheduleTime: data.schedule_time || null,
+      rounds: data.rounds || null,
+      maps: data.maps || null,
       dashboardChannel
     });
   },
@@ -396,11 +398,11 @@ const botBridge = {
   /**
    * Submits match score and refreshes scoreboard in Discord.
    */
-  updateScoreboard: async (tournamentId, round, p1, p2, score, winner) => {
+  updateScoreboard: async (tournamentId, round, p1, p2, score, winner, extraOptions = {}) => {
     const client = await botBridge.getClient();
     const guild = await botBridge.getGuild();
     const adminMember = (guild && guild.members && guild.members.me) ? guild.members.me : { id: 'web-admin', user: { tag: 'Web Admin', username: 'Web Admin' } };
-    return await tournamentHandler.updateScoreboard(client, tournamentId, round, p1, p2, score, winner, adminMember);
+    return await tournamentHandler.updateScoreboard(client, tournamentId, round, p1, p2, score, winner, adminMember, extraOptions);
   },
 
   /**

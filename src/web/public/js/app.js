@@ -119,87 +119,29 @@ function showDashboard() {
   document.getElementById('appContainer').classList.remove('hidden');
 }
 
-let selectedLoginRole = 'admin';
-
-function selectLoginRole(role) {
-  selectedLoginRole = role;
-  document.querySelectorAll('.role-btn').forEach(b => b.classList.remove('active'));
-  const btn = document.getElementById(`roleBtn${role.charAt(0).toUpperCase() + role.slice(1)}`);
-  if (btn) btn.classList.add('active');
-
-  const adminGroup = document.getElementById('loginAdminGroup');
-  const nameGroup = document.getElementById('loginNameGroup');
-  const teamGroup = document.getElementById('loginTeamGroup');
-  const submitBtn = document.getElementById('loginSubmitBtn');
-
-  if (role === 'admin') {
-    adminGroup.classList.remove('hidden');
-    nameGroup.classList.add('hidden');
-    teamGroup.classList.add('hidden');
-    submitBtn.innerText = '🔓 Access Management Software';
-  } else if (role === 'referee') {
-    adminGroup.classList.add('hidden');
-    nameGroup.classList.remove('hidden');
-    teamGroup.classList.add('hidden');
-    document.getElementById('loginNameLabel').innerText = 'Official Referee Name';
-    document.getElementById('loginName').placeholder = 'e.g. Official Sharma';
-    submitBtn.innerText = '⚖️ Enter as Match Referee';
-  } else if (role === 'manager') {
-    adminGroup.classList.add('hidden');
-    nameGroup.classList.remove('hidden');
-    teamGroup.classList.remove('hidden');
-    document.getElementById('loginNameLabel').innerText = 'Team Manager Name';
-    document.getElementById('loginName').placeholder = 'e.g. Coach David';
-    submitBtn.innerText = '👥 Enter as Team Manager';
-  }
-}
-
 async function handleLogin(e) {
   e.preventDefault();
   const errorEl = document.getElementById('loginError');
   errorEl.classList.add('hidden');
 
-  let body = { role: selectedLoginRole };
-
-  if (selectedLoginRole === 'admin') {
-    const pin = document.getElementById('adminPin').value.trim();
-    if (!pin) {
-      errorEl.innerText = 'Admin PIN is required.';
-      errorEl.classList.remove('hidden');
-      return;
-    }
-    body.pin = pin;
-  } else if (selectedLoginRole === 'referee') {
-    const name = document.getElementById('loginName').value.trim();
-    if (!name) {
-      errorEl.innerText = 'Official name is required.';
-      errorEl.classList.remove('hidden');
-      return;
-    }
-    body.name = name;
-  } else if (selectedLoginRole === 'manager') {
-    const name = document.getElementById('loginName').value.trim();
-    const team = document.getElementById('loginTeam').value.trim();
-    if (!name || !team) {
-      errorEl.innerText = 'Manager name and assigned team name are required.';
-      errorEl.classList.remove('hidden');
-      return;
-    }
-    body.name = name;
-    body.team = team;
+  const pin = document.getElementById('adminPin').value.trim();
+  if (!pin) {
+    errorEl.innerText = 'Admin PIN is required.';
+    errorEl.classList.remove('hidden');
+    return;
   }
 
   try {
     const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
+      body: JSON.stringify({ pin })
     });
     const data = await res.json();
     if (data.success && data.token) {
       currentToken = data.token;
-      currentRole = data.role || selectedLoginRole;
-      currentUserName = data.name || (currentRole === 'admin' ? 'League Administrator' : 'User');
+      currentRole = 'admin';
+      currentUserName = 'Tournament Director';
       localStorage.setItem('ple_admin_token', currentToken);
       localStorage.setItem('ple_user_role', currentRole);
       localStorage.setItem('ple_user_name', currentUserName);
@@ -208,7 +150,7 @@ async function handleLogin(e) {
       initDashboard();
       showToast(data.message || 'Login successful', 'success');
     } else {
-      errorEl.innerText = data.message || 'Invalid login details';
+      errorEl.innerText = data.message || 'Invalid Admin Access Key.';
       errorEl.classList.remove('hidden');
     }
   } catch (err) {
@@ -491,6 +433,8 @@ async function handleHostTournament(e) {
     rules: document.getElementById('hostRules').value.trim(),
     schedule_date: document.getElementById('hostScheduleDate')?.value || null,
     schedule_time: document.getElementById('hostScheduleTime')?.value || null,
+    rounds: document.getElementById('hostRounds')?.value.trim() || null,
+    maps: document.getElementById('hostMaps')?.value.trim() || null,
     channelId: document.getElementById('hostChannel').value || null
   };
 
@@ -1106,6 +1050,15 @@ function renderScoreboardEntries(entries, tourneyId) {
           <span class="score-badge-result">${escapeHtml(m.score)}</span>
         </div>
 
+        ${(m.kills !== undefined && m.kills !== null) || m.kda || m.efootball_id || m.proof_url ? `
+          <div style="font-size: 0.8rem; padding: 4px 0; color: var(--text-muted); display: flex; gap: 12px; flex-wrap: wrap; border-top: 1px dashed rgba(255,255,255,0.08); margin-top: 4px;">
+            ${(m.kills !== undefined && m.kills !== null) ? `<span style="color: #FF5252;">💥 <strong>${m.kills}</strong> Kills</span>` : ''}
+            ${m.kda ? `<span style="color: #00B0FF;">🎯 KDA: <strong>${escapeHtml(m.kda)}</strong></span>` : ''}
+            ${m.efootball_id ? `<span style="color: #FFAB00;">⚽ Room: <strong>${escapeHtml(m.efootball_id)}</strong></span>` : ''}
+            ${m.proof_url ? `<a href="${escapeHtml(m.proof_url)}" target="_blank" style="color: #00E676; text-decoration: underline;">📸 View Screenshot Proof</a>` : ''}
+          </div>
+        ` : ''}
+
         <div class="score-match-winner">
           <span>🏆 <strong>Winner / Top:</strong> ${escapeHtml(m.winner || m.player1)}</span>
           <span class="text-muted text-sm">Discord Synced ●</span>
@@ -1132,6 +1085,70 @@ async function handleDeleteScoreEntry(tourneyId, entryId) {
   }
 }
 
+let isEfootballLocked = false;
+
+function toggleEfootballLock() {
+  isEfootballLocked = !isEfootballLocked;
+  const idInput = document.getElementById('efootballRoomId');
+  const passInput = document.getElementById('efootballRoomPass');
+  const badge = document.getElementById('efootballLockBadge');
+  const btn = document.getElementById('btnToggleLockEfootball');
+
+  if (isEfootballLocked) {
+    if (idInput) idInput.readOnly = true;
+    if (passInput) passInput.readOnly = true;
+    if (badge) {
+      badge.innerText = '🔒 Locked for Round';
+      badge.style.background = 'rgba(255, 171, 0, 0.2)';
+      badge.style.color = '#FFAB00';
+    }
+    if (btn) btn.innerText = '🔓 Unlock Entry';
+    showToast('eFootball room credentials locked for this round.', 'info');
+  } else {
+    if (idInput) idInput.readOnly = false;
+    if (passInput) passInput.readOnly = false;
+    if (badge) {
+      badge.innerText = 'Unlocked';
+      badge.style.background = 'rgba(255, 255, 255, 0.1)';
+      badge.style.color = 'var(--text-muted)';
+    }
+    if (btn) btn.innerText = '🔒 Lock Entry';
+  }
+}
+
+async function handleProofFileSelected(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const preview = document.getElementById('scoreProofPreview');
+  const container = document.getElementById('scoreProofPreviewContainer');
+  const status = document.getElementById('scoreProofStatus');
+
+  const reader = new FileReader();
+  reader.onload = async function(event) {
+    const base64Data = event.target.result;
+    if (preview) preview.src = base64Data;
+    if (container) container.classList.remove('hidden');
+    if (status) status.innerText = '⏳ Uploading screenshot...';
+
+    // Upload to server
+    const res = await apiFetch('/api/upload/screenshot', {
+      method: 'POST',
+      body: JSON.stringify({ imageBase64: base64Data, filename: file.name })
+    });
+
+    if (res && res.success && res.url) {
+      document.getElementById('scoreProofUrl').value = res.url;
+      if (status) status.innerText = '✅ Screenshot verified & uploaded';
+      showToast('Screenshot uploaded successfully', 'success');
+    } else {
+      if (status) status.innerText = '❌ Upload failed';
+      showToast('Screenshot upload failed', 'danger');
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
 async function handleScoreSubmit(e) {
   e.preventDefault();
   const tourneyId = document.getElementById('scoreTourneySelect').value;
@@ -1144,12 +1161,23 @@ async function handleScoreSubmit(e) {
   btn.disabled = true;
   btn.innerText = '⏳ Syncing to Discord #📊-scoreboard...';
 
+  const killsVal = document.getElementById('scoreKills')?.value;
+  const kdaVal = document.getElementById('scoreKda')?.value.trim();
+  const proofUrlVal = document.getElementById('scoreProofUrl')?.value.trim();
+  const efootballIdVal = document.getElementById('efootballRoomId')?.value.trim();
+  const efootballPassVal = document.getElementById('efootballRoomPass')?.value.trim();
+
   const payload = {
     round: document.getElementById('scoreRound').value.trim(),
     p1: document.getElementById('scoreP1').value.trim(),
     p2: document.getElementById('scoreP2').value.trim() || 'N/A',
     result: document.getElementById('scoreResult').value.trim(),
-    winner: document.getElementById('scoreWinner').value.trim()
+    winner: document.getElementById('scoreWinner').value.trim(),
+    kills: killsVal !== '' && killsVal !== undefined ? parseInt(killsVal, 10) : null,
+    kda: kdaVal || null,
+    proofUrl: proofUrlVal || null,
+    efootballId: efootballIdVal || null,
+    efootballPass: efootballPassVal || null
   };
 
   try {
@@ -1159,9 +1187,20 @@ async function handleScoreSubmit(e) {
     });
 
     if (res && res.success) {
-      showToast('Match result submitted and broadcasted to Discord #📊-scoreboard!', 'success');
+      showToast('Match result, metrics & proof submitted to Discord #📊-scoreboard!', 'success');
       document.getElementById('scoreRound').value = '';
       document.getElementById('scoreResult').value = '';
+      if (document.getElementById('scoreKills')) document.getElementById('scoreKills').value = '';
+      if (document.getElementById('scoreKda')) document.getElementById('scoreKda').value = '';
+      document.getElementById('scoreProofFile').value = '';
+      document.getElementById('scoreProofUrl').value = '';
+      document.getElementById('scoreProofPreviewContainer').classList.add('hidden');
+
+      // Auto-lock eFootball credentials after entry for each round
+      if (efootballIdVal && !isEfootballLocked) {
+        toggleEfootballLock();
+      }
+
       handleScoreTourneyChange();
     } else {
       showToast(res ? res.message || res.error : 'Failed to broadcast scoreboard', 'danger');
@@ -1170,7 +1209,7 @@ async function handleScoreSubmit(e) {
     showToast('Network error updating scoreboard', 'danger');
   } finally {
     btn.disabled = false;
-    btn.innerText = '📢 Broadcast Score to Discord #📊-scoreboard';
+    btn.innerText = '📢 Broadcast Score & Metrics to Discord #📊-scoreboard';
   }
 }
 
@@ -1185,15 +1224,24 @@ async function loadTickets() {
     return;
   }
 
-  tbody.innerHTML = data.tickets.map(t => {
+  // Place active tickets at the very top
+  const sortedTickets = [...data.tickets].sort((a, b) => {
+    const aClosed = (a.status === 'CLOSED');
+    const bClosed = (b.status === 'CLOSED');
+    if (!aClosed && bClosed) return -1;
+    if (aClosed && !bClosed) return 1;
+    return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+  });
+
+  tbody.innerHTML = sortedTickets.map(t => {
     const isClosed = t.status === 'CLOSED';
     return `
-      <tr>
+      <tr style="${!isClosed ? 'background: rgba(0, 230, 118, 0.05); font-weight: 500;' : 'opacity: 0.75;'}">
         <td><code>#${escapeHtml(t.id || t.channelId)}</code></td>
         <td><span class="badge badge-info">${escapeHtml(t.category || 'General Support')}</span></td>
-        <td>${escapeHtml(t.username || t.tag || t.userId)}</td>
+        <td><strong>${escapeHtml(t.username || t.tag || t.userId)}</strong></td>
         <td><span class="badge ${isClosed ? 'badge-secondary' : 'badge-success'}">${t.status || 'OPEN'}</span></td>
-        <td>${t.claimedBy ? escapeHtml(t.claimedBy) : '<span class="text-muted">Unclaimed</span>'}</td>
+        <td>${t.claimedBy ? escapeHtml(t.claimedBy) : '<span class="text-warning">⚠️ Unclaimed</span>'}</td>
         <td>${new Date(t.createdAt || Date.now()).toLocaleString()}</td>
       </tr>
     `;
@@ -1211,15 +1259,65 @@ function escapeHtml(text) {
     .replace(/'/g, '&#039;');
 }
 
-// --- TAB 6: Announcements Handler ---
+// Live Discord Embed Preview Updater
+function updateAnnouncementPreview() {
+  const title = document.getElementById('announceTitle')?.value.trim() || 'Title Preview';
+  const msg = document.getElementById('announceMessage')?.value.trim() || 'Announcement text will be rendered live here as you type...';
+  const color = document.getElementById('announceColor')?.value || '#FFA500';
+  const ping = document.getElementById('announcePing')?.value;
+  const imgUrl = document.getElementById('announceImage')?.value.trim();
+
+  const previewCard = document.getElementById('announcePreviewCard');
+  const previewTitle = document.getElementById('previewTitle');
+  const previewMsg = document.getElementById('previewMessage');
+  const previewImg = document.getElementById('previewImage');
+  const previewPing = document.getElementById('previewPingNotice');
+
+  if (previewCard) previewCard.style.borderLeftColor = color;
+  if (previewTitle) previewTitle.innerText = title;
+  if (previewMsg) previewMsg.innerText = msg;
+
+  if (previewPing) {
+    if (ping === 'everyone') {
+      previewPing.style.display = 'block';
+      previewPing.innerText = '@everyone';
+    } else if (ping === 'here') {
+      previewPing.style.display = 'block';
+      previewPing.innerText = '@here';
+    } else {
+      previewPing.style.display = 'none';
+    }
+  }
+
+  if (previewImg) {
+    if (imgUrl) {
+      previewImg.src = imgUrl;
+      previewImg.style.display = 'block';
+    } else {
+      previewImg.style.display = 'none';
+    }
+  }
+}
+
+// --- TAB 6: Announcements Handler (Supports Multiple Channels Simultaneously) ---
 async function handleSendAnnouncement(e) {
   e.preventDefault();
   const btn = document.getElementById('btnSendAnnouncement');
   btn.disabled = true;
   btn.innerText = '⏳ Broadcasting to Discord...';
 
+  const select = document.getElementById('announceChannel');
+  const selectedChannels = Array.from(select.selectedOptions).map(opt => opt.value).filter(Boolean);
+
+  if (selectedChannels.length === 0) {
+    showToast('Please select at least one Discord channel', 'warning');
+    btn.disabled = false;
+    btn.innerText = '🚀 Broadcast Announcement to Discord Channels';
+    return;
+  }
+
   const payload = {
-    channelId: document.getElementById('announceChannel').value,
+    channelIds: selectedChannels,
     ping: document.getElementById('announcePing').value,
     color: document.getElementById('announceColor').value,
     title: document.getElementById('announceTitle').value.trim(),
@@ -1236,6 +1334,7 @@ async function handleSendAnnouncement(e) {
     if (res && res.success) {
       showToast(res.message || 'Announcement broadcasted to Discord!', 'success');
       document.getElementById('announcementForm').reset();
+      updateAnnouncementPreview();
     } else {
       showToast(res ? res.message : 'Failed to send announcement', 'danger');
     }
@@ -1243,7 +1342,7 @@ async function handleSendAnnouncement(e) {
     showToast('Network error sending announcement', 'danger');
   } finally {
     btn.disabled = false;
-    btn.innerText = '🚀 Broadcast Announcement to Discord';
+    btn.innerText = '🚀 Broadcast Announcement to Discord Channels';
   }
 }
 

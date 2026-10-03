@@ -11,43 +11,24 @@
 </head>
 <body>
 
-  <!-- Login Modal / Screen with Role Selection -->
+  <!-- Login Modal / Screen (Admin-Only Access) -->
   <div id="loginOverlay" class="login-overlay">
     <div class="login-card">
-      <div class="brand-badge">🛡️ PORTAL ACCESS</div>
-      <h2>Sports League & Esports Hub</h2>
-      <p class="subtitle">State Meets, League Management & Esports Platform</p>
-      
-      <!-- Role Switcher Tabs in Login -->
-      <div class="role-selector" style="display: flex; gap: 8px; margin-bottom: 16px;">
-        <button type="button" class="btn btn-sm role-btn active" id="roleBtnAdmin" onclick="selectLoginRole('admin')">👑 League Admin</button>
-        <button type="button" class="btn btn-sm role-btn" id="roleBtnReferee" onclick="selectLoginRole('referee')">⚖️ Match Referee</button>
-        <button type="button" class="btn btn-sm role-btn" id="roleBtnManager" onclick="selectLoginRole('manager')">👥 Team Manager</button>
-      </div>
+      <div class="brand-badge">🛡️ ADMIN PORTAL ACCESS</div>
+      <h2>Prime Lobby Esports</h2>
+      <p class="subtitle">Tournament Management & Broadcast Command Center</p>
 
       <form id="loginForm" onsubmit="handleLogin(event)">
-        <!-- Admin PIN field (shown for admin) -->
+        <!-- Admin PIN field -->
         <div class="form-group" id="loginAdminGroup">
           <label for="adminPin">Admin Access PIN / Secret Key</label>
-          <input type="password" id="adminPin" placeholder="Enter Admin Secret PIN (Default: PLE-ADMIN-2026)" autocomplete="current-password">
-        </div>
-
-        <!-- Official / Referee / Manager Name field -->
-        <div class="form-group hidden" id="loginNameGroup">
-          <label for="loginName" id="loginNameLabel">Your Full Name</label>
-          <input type="text" id="loginName" placeholder="e.g. Official Ref Sharma">
-        </div>
-
-        <!-- Manager Team Name field -->
-        <div class="form-group hidden" id="loginTeamGroup">
-          <label for="loginTeam">Assigned Team Name</label>
-          <input type="text" id="loginTeam" placeholder="e.g. St. Xavier Titans / Red Dragons">
+          <input type="password" id="adminPin" placeholder="Enter Admin Secret PIN" required autocomplete="current-password">
         </div>
 
         <button type="submit" id="loginSubmitBtn" class="btn btn-primary btn-block">🔓 Access Management Software</button>
       </form>
       <div id="loginError" class="alert alert-danger hidden"></div>
-      <p class="login-footer">🔒 Role-based access for League Directors, Referees, and Team Managers.</p>
+      <p class="login-footer">🔒 Restricted to authorized Discord Server Administrators & Staff.</p>
     </div>
   </div>
 
@@ -65,14 +46,14 @@
       </div>
 
       <nav class="nav-tabs">
-        <button class="nav-tab active" onclick="switchTab('leagues')">🏅 Sports Leagues & State Meets</button>
-        <button class="nav-tab" onclick="switchTab('tournaments')">🏆 Esports Tournaments</button>
-        <button class="nav-tab" onclick="switchTab('participants')">👥 Teams & Slots</button>
+        <button class="nav-tab active" onclick="switchTab('tournaments')">🏆 Tournaments Center</button>
         <button class="nav-tab" onclick="switchTab('payments')">💳 Payment Ledger</button>
-        <button class="nav-tab" onclick="switchTab('scoreboard')">📊 Match Scoreboard</button>
-        <button class="nav-tab" onclick="switchTab('production')">🎬 Broadcast (OBS/TournaLink)</button>
         <button class="nav-tab" onclick="switchTab('tickets')">🎫 Support Tickets</button>
+        <button class="nav-tab" onclick="switchTab('scoreboard')">📊 Match Scoreboard</button>
+        <button class="nav-tab" onclick="switchTab('participants')">👥 Teams & Slots</button>
+        <button class="nav-tab" onclick="switchTab('production')">🎬 Broadcast (OBS/TournaLink)</button>
         <button class="nav-tab" onclick="switchTab('announcements')">📢 Announcements</button>
+        <button class="nav-tab" onclick="switchTab('leagues')">🏅 School & State Meets</button>
       </nav>
 
       <div class="nav-actions">
@@ -125,7 +106,7 @@
       </section>
 
       <!-- TAB 0: Sports League & State Meets Management -->
-      <section id="tab-leagues" class="tab-pane active">
+      <section id="tab-leagues" class="tab-pane">
         <div class="pane-header">
           <div>
             <h2>🏅 Sports League & State Tournament Command</h2>
@@ -285,7 +266,7 @@
       </section>
 
       <!-- TAB 1: Tournaments Management -->
-      <section id="tab-tournaments" class="tab-pane">
+      <section id="tab-tournaments" class="tab-pane active">
         <div class="pane-header">
           <div>
             <h2>🏆 Tournament Command Center</h2>
@@ -464,12 +445,57 @@
 
               <div class="form-row">
                 <div class="form-group flex-1">
-                  <label>Score / Points / Kills Result</label>
+                  <label>Score / Points / Result</label>
                   <input type="text" id="scoreResult" placeholder="e.g. 15 Kills (WWCD) or 13 - 9 or 3 - 1" required>
                 </div>
                 <div class="form-group flex-1">
                   <label>Round Winner / Top Team</label>
                   <input type="text" id="scoreWinner" list="teamNamesList" placeholder="e.g. Team Alpha" required>
+                </div>
+              </div>
+
+              <!-- Game Metrics: Kills & KDA (PUBG, Valorant, Free Fire) -->
+              <div class="form-row" id="metricsRow">
+                <div class="form-group flex-1">
+                  <label>Total Team Kills (PUBG / FF / Val)</label>
+                  <input type="number" id="scoreKills" min="0" placeholder="e.g. 14">
+                </div>
+                <div class="form-group flex-1">
+                  <label>KDA Metric (Valorant / Tactical)</label>
+                  <input type="text" id="scoreKda" placeholder="e.g. 24/11/8 or 2.18">
+                </div>
+              </div>
+
+              <!-- Verification Screenshot Upload -->
+              <div class="form-group">
+                <label>📸 Verification Screenshot Upload</label>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                  <input type="file" id="scoreProofFile" accept="image/*" onchange="handleProofFileSelected(event)" style="padding: 6px; font-size: 0.85rem; background: rgba(255,255,255,0.05); border-radius: 6px; flex: 1;">
+                  <input type="hidden" id="scoreProofUrl">
+                </div>
+                <div id="scoreProofPreviewContainer" class="hidden" style="margin-top: 8px; display: flex; align-items: center; gap: 10px;">
+                  <img id="scoreProofPreview" src="" alt="Proof Preview" style="max-height: 60px; border-radius: 4px; border: 1px solid var(--border-light);">
+                  <span id="scoreProofStatus" style="font-size: 0.8rem; color: #00E676;">Ready for sync</span>
+                </div>
+              </div>
+
+              <!-- eFootball Locked Room ID & Password section -->
+              <div id="efootballCredentialsSection" style="background: rgba(0, 180, 216, 0.06); border: 1px solid rgba(0, 180, 216, 0.2); border-radius: 8px; padding: 12px; margin-bottom: 14px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                  <label style="margin: 0; font-size: 0.85rem; font-weight: 700; color: var(--primary);">⚽ eFootball Match Room Credentials</label>
+                  <span id="efootballLockBadge" class="badge" style="background: rgba(255,255,255,0.1); color: var(--text-muted); font-size: 0.75rem;">Unlocked</span>
+                </div>
+                <div class="form-row">
+                  <div class="form-group flex-1" style="margin-bottom: 0;">
+                    <input type="text" id="efootballRoomId" placeholder="Room ID (Locks on entry)">
+                  </div>
+                  <div class="form-group flex-1" style="margin-bottom: 0;">
+                    <input type="text" id="efootballRoomPass" placeholder="Room Pass (Locks on entry)">
+                  </div>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px;">
+                  <span style="font-size: 0.75rem; color: var(--text-muted);">Locks credentials for this round to prevent tampering.</span>
+                  <button type="button" class="btn btn-xs btn-outline" id="btnToggleLockEfootball" onclick="toggleEfootballLock()">🔒 Lock Entry</button>
                 </div>
               </div>
 
@@ -481,7 +507,7 @@
               </div>
 
               <button type="submit" id="btnSubmitScore" class="btn btn-primary btn-block" style="margin-top: 15px;">
-                📢 Broadcast Score to Discord #📊-scoreboard
+                📢 Broadcast Score & Metrics to Discord #📊-scoreboard
               </button>
             </form>
           </div>
@@ -722,47 +748,60 @@
           <form id="announcementForm" onsubmit="handleSendAnnouncement(event)">
             <div class="form-row">
               <div class="form-group flex-1">
-                <label>Target Channel</label>
-                <select id="announceChannel" required>
-                  <option value="">Select Channel...</option>
+                <label>Target Channels (Hold Ctrl/Cmd to select multiple)</label>
+                <select id="announceChannel" multiple style="height: 100px; padding: 6px;" required onchange="updateAnnouncementPreview()">
+                  <option value="">Select Channel(s)...</option>
                 </select>
+                <span style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; display: block;">Simultaneously broadcasts to all highlighted channels</span>
               </div>
               <div class="form-group flex-1">
                 <label>Notification Ping</label>
-                <select id="announcePing">
+                <select id="announcePing" onchange="updateAnnouncementPreview()">
                   <option value="none">No Mention (Silent)</option>
                   <option value="here">@here (Online Members)</option>
                   <option value="everyone">@everyone (All Members)</option>
                 </select>
-              </div>
-              <div class="form-group flex-1">
-                <label>Color Theme</label>
-                <select id="announceColor">
-                  <option value="#FFA500">Gold / Orange (Esports)</option>
-                  <option value="#0099FF">Electric Blue (Official)</option>
-                  <option value="#2ECC71">Emerald Green (Success / Registration)</option>
-                  <option value="#E74C3C">Crimson Red (Urgent / Warning)</option>
-                  <option value="#9B59B6">Purple (Special Event)</option>
-                </select>
+                <div style="margin-top: 14px;">
+                  <label>Color Theme</label>
+                  <select id="announceColor" onchange="updateAnnouncementPreview()">
+                    <option value="#FFA500">Gold / Orange (Esports)</option>
+                    <option value="#0099FF">Electric Blue (Official)</option>
+                    <option value="#2ECC71">Emerald Green (Success / Registration)</option>
+                    <option value="#E74C3C">Crimson Red (Urgent / Warning)</option>
+                    <option value="#9B59B6">Purple (Special Event)</option>
+                  </select>
+                </div>
               </div>
             </div>
 
             <div class="form-group">
               <label>Announcement Title / Headline</label>
-              <input type="text" id="announceTitle" placeholder="e.g. 🏆 Registration Open for PUBG Mobile Championship!" required>
+              <input type="text" id="announceTitle" placeholder="e.g. 🏆 Registration Open for PUBG Mobile Championship!" required oninput="updateAnnouncementPreview()">
             </div>
 
             <div class="form-group">
               <label>Message Content (Supports Markdown, bullet points, emojis)</label>
-              <textarea id="announceMessage" rows="5" placeholder="Enter full announcement details here..." required></textarea>
+              <textarea id="announceMessage" rows="5" placeholder="Enter full announcement details here..." required oninput="updateAnnouncementPreview()"></textarea>
             </div>
 
             <div class="form-group">
               <label>Banner Image URL (Optional)</label>
-              <input type="url" id="announceImage" placeholder="https://example.com/banner.png">
+              <input type="url" id="announceImage" placeholder="https://example.com/banner.png" oninput="updateAnnouncementPreview()">
             </div>
 
-            <button type="submit" id="btnSendAnnouncement" class="btn btn-primary">🚀 Broadcast Announcement to Discord</button>
+            <!-- Live Discord Embed Preview Box -->
+            <div style="margin-bottom: 20px;">
+              <label style="font-weight: 700; color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase;">👁️ Live Discord Embed Preview</label>
+              <div id="announcePreviewCard" style="background: #2f3136; border-left: 4px solid #FFA500; border-radius: 4px; padding: 14px; margin-top: 6px; box-shadow: 0 4px 15px rgba(0,0,0,0.4);">
+                <div id="previewPingNotice" style="font-size: 0.8rem; color: #5865F2; margin-bottom: 6px; display: none;">@everyone</div>
+                <h4 id="previewTitle" style="color: #ffffff; margin: 0 0 8px; font-size: 1.05rem;">Title Preview</h4>
+                <div id="previewMessage" style="color: #dcddde; font-size: 0.9rem; line-height: 1.45; white-space: pre-wrap;">Announcement text will be rendered live here as you type...</div>
+                <img id="previewImage" src="" alt="Banner Preview" style="max-width: 100%; border-radius: 4px; margin-top: 10px; display: none;">
+                <div style="margin-top: 10px; font-size: 0.75rem; color: #72767d;">Prime Lobby Esports • Official Announcement • Today</div>
+              </div>
+            </div>
+
+            <button type="submit" id="btnSendAnnouncement" class="btn btn-primary btn-block">🚀 Broadcast Announcement to Discord Channels</button>
           </form>
         </div>
       </section>
@@ -849,16 +888,28 @@
           </div>
         </div>
 
+        <!-- Round Configurations & Map Names -->
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label for="hostRounds">⚔️ Round Configurations</label>
+            <input type="text" id="hostRounds" placeholder="e.g. Round 1 (Upper), Lower Bracket, Grand Finals" value="Round 1, Semi-Finals, Grand Finals">
+          </div>
+          <div class="form-group flex-1">
+            <label for="hostMaps">🗺️ Map Names / Rotations</label>
+            <input type="text" id="hostMaps" placeholder="e.g. Erangel, Miramar, Sanhok or Haven, Ascent, Bind" value="Map 1: Erangel, Map 2: Miramar, Map 3: Sanhok">
+          </div>
+        </div>
+
         <div class="form-group">
-          <label for="hostChannel">Target Registration Channel (Discord)</label>
+          <label for="hostChannel">Target Registration & Announcement Channel (Discord)</label>
           <select id="hostChannel">
             <option value="">Auto-Detect Default Game Registration Channel</option>
           </select>
         </div>
 
         <div class="form-group">
-          <label for="hostRules">Tournament Rules & Guidelines</label>
-          <textarea id="hostRules" rows="3" placeholder="Enter map sequence, points table, extra rules..."></textarea>
+          <label for="hostRules">Tournament Rules & Guidelines (Premier League-Style Regulations)</label>
+          <textarea id="hostRules" rows="3" placeholder="Enter map sequence, points table, extra rules...">Official Premier League-Style Rules: 3 Points for Win, 1 Point for Draw. Standard competitive overtime & tiebreakers apply.</textarea>
         </div>
 
         <div class="modal-footer">

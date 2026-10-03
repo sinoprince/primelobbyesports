@@ -283,6 +283,11 @@ const dbQueries = {
       player2: dataObj.player2,
       score: dataObj.score,
       winner: dataObj.winner,
+      kills: dataObj.kills !== undefined ? dataObj.kills : null,
+      kda: dataObj.kda || null,
+      proof_url: dataObj.proof_url || null,
+      efootball_id: dataObj.efootball_id || null,
+      efootball_pass: dataObj.efootball_pass || null,
       notes: dataObj.notes || '',
       updated_by: dataObj.updated_by,
       created_at: new Date().toISOString()

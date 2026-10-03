@@ -9,53 +9,43 @@ const app = express();
 const PORT = process.env.PORT || process.env.WEB_PORT || 3000;
 const ADMIN_SECRET = process.env.ADMIN_WEB_SECRET || 'PLE-ADMIN-2026';
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '25mb' }));
+app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Role-Based Auth Helpers
+// Ensure uploads directory exists
+const uploadsDir = path.join(__dirname, 'public/uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+// Admin-Only Auth Helpers
 function getAuthInfo(req) {
   const authHeader = req.headers['authorization'] || req.headers['x-admin-key'] || req.query.key;
   if (!authHeader) return null;
   const token = authHeader.replace(/^Bearer\s+/i, '').trim();
 
-  // 1. Master Admin Token
+  // Strictly Master Admin Token
   if (token === ADMIN_SECRET) {
     return { role: 'admin', name: 'Master Administrator' };
   }
 
-  // 2. Parsed Session Token (e.g. ROLE:NAME or referee/manager)
-  try {
-    if (token.startsWith('ROLE_')) {
-      const parts = Buffer.from(token.replace('ROLE_', ''), 'base64').toString('utf-8').split(':');
-      return { role: parts[0], name: parts[1] || parts[0], team: parts[2] || null };
-    }
-  } catch (e) {}
-
   return null;
 }
 
-// Simple Auth Middleware for Admin
+// Simple Auth Middleware for Admin Only
 function checkAdminAuth(req, res, next) {
   const auth = getAuthInfo(req);
   if (!auth) {
-    return res.status(401).json({ success: false, message: 'Authentication required. Please log in.' });
-  }
-  if (auth.role !== 'admin') {
-    return res.status(403).json({ success: false, message: 'Access denied. Administrator privileges required.' });
+    return res.status(401).json({ success: false, message: 'Authentication required. Please enter Admin PIN.' });
   }
   req.user = auth;
   next();
 }
 
-// Middleware allowing Admin OR Referee OR Team Manager
+// Middleware allowing Admin
 function checkAnyAuth(req, res, next) {
-  const auth = getAuthInfo(req);
-  if (!auth) {
-    return res.status(401).json({ success: false, message: 'Authentication required. Please log in.' });
-  }
-  req.user = auth;
-  next();
+  return checkAdminAuth(req, res, next);
 }
 
 // 0. Lightweight Health Check Endpoints (for UptimeRobot / Cron pings)
@@ -66,55 +56,54 @@ app.get('/ping', (req, res) => {
   res.status(200).send('pong');
 });
 
-// 1. Auth Endpoint (supports Master Admin PIN and Role Logins)
+// 1. Auth Endpoint (Admin-Only Login)
 app.post('/api/auth/login', (req, res) => {
   const pin = req.body.pin || req.body.secret || req.body.password;
-  const role = req.body.role || 'admin';
-  const name = req.body.name || req.body.username || '';
-  const team = req.body.team || '';
 
-  // Master Admin login
-  if (role === 'admin') {
-    if (pin && pin.trim() === ADMIN_SECRET) {
-      return res.json({ 
-        success: true, 
-        token: ADMIN_SECRET, 
-        role: 'admin', 
-        name: 'League Administrator',
-        message: 'Administrator login successful' 
-      });
+  if (pin && pin.trim() === ADMIN_SECRET) {
+    return res.json({ 
+      success: true, 
+      token: ADMIN_SECRET, 
+      role: 'admin', 
+      name: 'Tournament Director',
+      message: 'Admin authentication verified.' 
+    });
+  }
+  return res.status(401).json({ success: false, message: 'Invalid Admin Access Key.' });
+});
+
+// Verification screenshot upload endpoint
+app.post('/api/upload/screenshot', checkAdminAuth, (req, res) => {
+  try {
+    const { imageBase64, filename } = req.body;
+    if (!imageBase64) {
+      return res.status(400).json({ success: false, message: 'Image data is required' });
     }
-    return res.status(401).json({ success: false, message: 'Incorrect Admin PIN. Access denied.' });
-  }
 
-  // Referee / Official login
-  if (role === 'referee') {
-    const refName = (name || 'Match Referee').trim();
-    const tokenPayload = `ROLE_` + Buffer.from(`referee:${refName}`).toString('base64');
-    return res.json({
+    const matches = imageBase64.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+    let buffer;
+    let ext = '.png';
+
+    if (matches && matches.length === 3) {
+      buffer = Buffer.from(matches[2], 'base64');
+      if (matches[1].includes('jpeg') || matches[1].includes('jpg')) ext = '.jpg';
+      else if (matches[1].includes('webp')) ext = '.webp';
+    } else {
+      buffer = Buffer.from(imageBase64, 'base64');
+    }
+
+    const safeName = `proof_${Date.now()}_${Math.floor(Math.random() * 10000)}${ext}`;
+    const filePath = path.join(uploadsDir, safeName);
+    fs.writeFileSync(filePath, buffer);
+
+    res.json({
       success: true,
-      token: tokenPayload,
-      role: 'referee',
-      name: refName,
-      message: `Logged in as Match Referee: ${refName}`
+      url: `/uploads/${safeName}`,
+      message: 'Screenshot uploaded successfully'
     });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
-
-  // Team Manager login
-  if (role === 'manager') {
-    const mgrName = (name || 'Team Manager').trim();
-    const tokenPayload = `ROLE_` + Buffer.from(`manager:${mgrName}:${team}`).toString('base64');
-    return res.json({
-      success: true,
-      token: tokenPayload,
-      role: 'manager',
-      name: mgrName,
-      team: team || 'Independent Team',
-      message: `Logged in as Team Manager: ${mgrName}`
-    });
-  }
-
-  return res.status(400).json({ success: false, message: 'Invalid role specified.' });
 });
 
 // 2. Overview Stats Endpoint
@@ -190,6 +179,9 @@ app.post('/api/tournaments/create', checkAdminAuth, async (req, res) => {
     const schedule_time = req.body.schedule_time || req.body.time || null;
     const dashboard_channel_id = req.body.dashboard_channel_id || req.body.channelId || null;
 
+    const rounds = req.body.rounds || null;
+    const maps = req.body.maps || null;
+
     if (!title || !game || !max_participants || !entry_fee || !prize_pool) {
       return res.status(400).json({ success: false, message: 'Please fill in all required tournament fields.' });
     }
@@ -204,6 +196,8 @@ app.post('/api/tournaments/create', checkAdminAuth, async (req, res) => {
       rules_text,
       schedule_date,
       schedule_time,
+      rounds,
+      maps,
       dashboard_channel_id
     });
 
@@ -377,12 +371,23 @@ app.post('/api/tournaments/:id/score', checkAdminAuth, async (req, res) => {
     const player2 = req.body.player2 || req.body.p2 || 'N/A';
     const score = req.body.score || req.body.result;
     const winner = req.body.winner || player1;
+    const kills = req.body.kills !== undefined ? req.body.kills : null;
+    const kda = req.body.kda || null;
+    const proofUrl = req.body.proofUrl || req.body.proof_url || null;
+    const efootballId = req.body.efootballId || req.body.efootball_id || null;
+    const efootballPass = req.body.efootballPass || req.body.efootball_pass || null;
 
     if (!round || !player1 || !score) {
       return res.status(400).json({ success: false, message: 'Round, Player/Team 1, and Score are required.' });
     }
 
-    const result = await botBridge.updateScoreboard(tournamentId, round, player1, player2, score, winner);
+    const result = await botBridge.updateScoreboard(tournamentId, round, player1, player2, score, winner, {
+      kills,
+      kda,
+      proofUrl,
+      efootballId,
+      efootballPass
+    });
     res.json({ success: true, message: result.message });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -607,16 +612,30 @@ app.post('/api/tickets/:channelId/close', checkAdminAuth, async (req, res) => {
   }
 });
 
-// 9. Announcement Broadcaster Endpoint
+// 9. Announcement Broadcaster Endpoint (Supports Multiple Channels)
 app.post('/api/announcements', checkAdminAuth, async (req, res) => {
   try {
-    const { channelId, title, message, ping, color, imageUrl } = req.body;
-    if (!channelId || !title || !message) {
-      return res.status(400).json({ success: false, message: 'Channel, Title, and Message are required.' });
+    const { channelId, channelIds, title, message, ping, color, imageUrl } = req.body;
+    const targetChannels = Array.isArray(channelIds) && channelIds.length > 0 
+      ? channelIds 
+      : (channelId ? [channelId] : []);
+
+    if (targetChannels.length === 0 || !title || !message) {
+      return res.status(400).json({ success: false, message: 'At least one target Channel, Title, and Message are required.' });
     }
-    const result = await botBridge.sendAnnouncement({ channelId, title, message, ping, color, imageUrl });
-    if (!result.success) return res.status(400).json(result);
-    res.json(result);
+
+    const results = [];
+    for (const chId of targetChannels) {
+      const resSingle = await botBridge.sendAnnouncement({ channelId: chId, title, message, ping, color, imageUrl });
+      results.push(resSingle);
+    }
+
+    const successful = results.filter(r => r && r.success).length;
+    res.json({
+      success: true,
+      message: `Announcement "${title}" broadcasted to ${successful} Discord channel(s)!`,
+      results
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

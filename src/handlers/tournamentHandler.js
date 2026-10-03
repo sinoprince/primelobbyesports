@@ -361,14 +361,31 @@ const tournamentHandler = {
       const initialScoreboard = embedBuilder.createTournamentScoreboardEmbed(tournament, [], []);
       const scoreboardMsg = await scoreboardChannel.send(initialScoreboard);
 
-      // 10. Post Welcome Announcement in Game Announcements Channel
+      // 10. Post Comprehensive Premier League-Style Announcement in Game Announcements Channel
       if (announcementsChannel && announcementsChannel.id !== dashboardChannel.id) {
+        const scheduleInfo = (options.scheduleDate || options.scheduleTime) 
+          ? `📅 **Kickoff Schedule:** \`${options.scheduleDate || 'Match Day'} at ${options.scheduleTime || 'TBD'} IST\`\n`
+          : '';
+
+        const mapsInfo = options.maps ? `🗺️ **Map Rotation / Arenas:** \`${options.maps}\`\n` : '';
+        const roundsInfo = options.rounds ? `⚔️ **Tournament Rounds:** \`${options.rounds}\`\n` : '';
+
         await announcementsChannel.send({
-          content: `🎉 🏆 **NEW TOURNAMENT ANNOUNCEMENT: ${title}**\n` +
-            `• Role: <@&${tournamentRole.id}>\n` +
-            `• 📝 **Registration Desk:** <#${dashboardChannel.id}>\n` +
-            `• 📊 **Live Scoreboard:** <#${scoreboardChannel.id}>\n\n` +
-            `👉 Head over to <#${dashboardChannel.id}> to register before slots fill up!`
+          content: `🎉 🏆 **OFFICIAL TOURNAMENT LAUNCH: ${title}**\n` +
+            `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+            `• 🎮 **Discipline:** \`${game} (${formatLabel})\`\n` +
+            `• 🥇 **Prize Pool:** **${prizePool}**\n` +
+            `• 💰 **Entry Fee:** \`${entryFee}\`\n` +
+            `• 👥 **Slots:** \`${maxParticipants} ${teamUnit} Max\`\n` +
+            scheduleInfo +
+            mapsInfo +
+            roundsInfo +
+            `• ⚖️ **League Regulations:** Premier League Competitive Rules Apply (Win = 3 Pts, Draw = 1 Pt, Official Overtime/Tiebreaker Regulations)\n\n` +
+            `📌 **Official Access Links:**\n` +
+            `• 📝 **Registration Desk & Slot Claim:** <#${dashboardChannel.id}>\n` +
+            `• 📊 **Live Match Scoreboard & Bracket:** <#${scoreboardChannel.id}>\n` +
+            `• 💬 **Competitor Chat:** <#${chatChannel.id}>\n\n` +
+            `👉 *Click the Register button in <#${dashboardChannel.id}> to lock in your squad!*`
         }).catch(() => null);
       }
 
@@ -622,11 +639,13 @@ const tournamentHandler = {
    * Scoreboard Management System:
    * Adds match score & winner, updates persistent scoreboard, and broadcasts to announcements & match-chat!
    */
-  updateScoreboard: async (client, tournamentId, round, player1, player2, score, winner, adminMember) => {
+  updateScoreboard: async (client, tournamentId, round, player1, player2, score, winner, adminMember, extraOptions = {}) => {
     const tournament = dbQueries.getTournament(tournamentId);
     if (!tournament) {
       return { success: false, message: 'Tournament not found.' };
     }
+
+    const { kills, kda, proofUrl, efootballId, efootballPass } = extraOptions;
 
     try {
       // 1. Record entry in Database
@@ -637,6 +656,11 @@ const tournamentHandler = {
         player2,
         score,
         winner,
+        kills,
+        kda,
+        proof_url: proofUrl,
+        efootball_id: efootballId,
+        efootball_pass: efootballPass,
         updated_by: adminMember.id
       });
 
@@ -654,7 +678,8 @@ const tournamentHandler = {
             player2,
             score,
             winner,
-            adminMember.user
+            adminMember.user,
+            { kills, kda, proofUrl, efootballId, efootballPass }
           );
           await annChan.send(scoreboardPayload);
         }
@@ -665,8 +690,13 @@ const tournamentHandler = {
       if (tournament.chat_channel_id) {
         const chatChan = await client.channels.fetch(tournament.chat_channel_id).catch(() => null);
         if (chatChan) {
+          let extraInfo = '';
+          if (kills !== null && kills !== undefined) extraInfo += ` | Kills: \`${kills}\``;
+          if (kda) extraInfo += ` | KDA: \`${kda}\``;
+          if (efootballId) extraInfo += ` | ⚽ Room: \`${efootballId}\``;
+
           await chatChan.send({
-            content: `📢 **Scoreboard Update:** \`${round}\` — ${matchDisplay} | Score: \`${score}\` | 🏆 Winner: **${winner}**`
+            content: `📢 **Scoreboard Update:** \`${round}\` — ${matchDisplay} | Score: \`${score}\`${extraInfo} | 🏆 Winner: **${winner}**`
           });
         }
       }
@@ -677,6 +707,8 @@ const tournamentHandler = {
           `• **Round:** \`${round}\`\n` +
           `• **Competitor(s):** ${player2 ? `${player1} vs ${player2}` : player1}\n` +
           `• **Score:** \`${score}\`\n` +
+          (kills !== null && kills !== undefined ? `• **Kills:** \`${kills}\`\n` : '') +
+          (kda ? `• **KDA:** \`${kda}\`\n` : '') +
           `• **Winner:** 🏆 **${winner}**\n` +
           `• **Live Scoreboard:** <#${tournament.scores_channel_id || tournament.scoreboard_channel_id}>\n` +
           `• **Broadcasted to:** <#${tournament.announcements_channel_id}>`

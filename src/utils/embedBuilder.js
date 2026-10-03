@@ -335,7 +335,14 @@ const embedBuilder = {
   },
 
   // Live Scoreboard & Match Result Announcement Embed
-  createScoreboardEmbed: (tournament, round, player1, player2, score, winner, adminUser) => {
+  createScoreboardEmbed: (tournament, round, player1, player2, score, winner, adminUser, extra = {}) => {
+    const { kills, kda, proofUrl, efootballId, efootballPass } = extra;
+
+    let metricsText = '';
+    if (kills !== null && kills !== undefined) metricsText += `💥 **Eliminations / Kills:** \`${kills}\`\n`;
+    if (kda) metricsText += `🎯 **Combat Metric / KDA:** \`${kda}\`\n`;
+    if (efootballId) metricsText += `⚽ **eFootball Room ID:** \`${efootballId}\` ${efootballPass ? `| **Password:** \`${efootballPass}\`` : ''}\n`;
+
     const embed = new EmbedBuilder()
       .setColor('#00E676')
       .setTitle(`📊 MATCH RESULT & SCOREBOARD — ${tournament.title}`)
@@ -343,14 +350,23 @@ const embedBuilder = {
         `🏆 **Tournament:** **${tournament.title}** (\`${tournament.game}\`)\n` +
         `⚔️ **Stage / Round:** \`${round}\`\n\n` +
         (player2 ? `**Matchup:**\n🔹 **${player1}**  🆚  🔸 **${player2}**\n\n` : `**Team / Player:** **${player1}**\n\n`) +
-        `🎯 **Score / Points:**\n` +
+        `🎯 **Score / Result:**\n` +
         `\`\`\`\n${score}\n\`\`\`\n` +
+        (metricsText ? `${metricsText}\n` : '') +
         (winner ? `👑 **RESULT / WINNER:**\n### 🏆 **${winner}**\n\n` : '') +
         `━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
         `*Official result updated by Admin <@${adminUser.id}>*`
       )
       .setFooter({ text: `${tournament.title} Official Scoreboard` })
       .setTimestamp();
+
+    if (proofUrl) {
+      // If full url or path
+      const fullUrl = proofUrl.startsWith('http') ? proofUrl : `${process.env.BASE_URL || ''}${proofUrl}`;
+      if (fullUrl.startsWith('http')) {
+        embed.setImage(fullUrl);
+      }
+    }
 
     return { embeds: [embed] };
   },
