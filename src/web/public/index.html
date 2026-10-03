@@ -655,6 +655,18 @@
           </div>
         </div>
 
+        <!-- Tournament Scheduling -->
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label for="hostScheduleDate">📅 Tournament Schedule Date (Optional)</label>
+            <input type="date" id="hostScheduleDate">
+          </div>
+          <div class="form-group flex-1">
+            <label for="hostScheduleTime">⏰ Match Start Time (IST)</label>
+            <input type="time" id="hostScheduleTime">
+          </div>
+        </div>
+
         <div class="form-group">
           <label for="hostChannel">Target Registration Channel (Discord)</label>
           <select id="hostChannel">
@@ -834,6 +846,40 @@
         <div class="modal-footer">
           <button type="button" class="btn btn-outline" onclick="closeApproveMatchModal()">Cancel</button>
           <button type="submit" class="btn btn-success">✅ Confirm & Release Table</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Broadcast Custom Room Credentials Modal -->
+  <div id="roomModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>🔐 Dispatch Custom Room ID & Password</h3>
+        <button class="modal-close" onclick="closeRoomModal()">&times;</button>
+      </div>
+      <form id="roomForm" onsubmit="handleBroadcastRoomSubmit(event)">
+        <input type="hidden" id="roomTourneyId">
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 14px;">
+          Credentials are dispatched securely to confirmed players via <strong>Discord DM</strong> and posted in the private <strong>#match-chat</strong> channel.
+        </p>
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label>Custom Room ID / Name</label>
+            <input type="text" id="roomInputId" required placeholder="e.g. 5189234">
+          </div>
+          <div class="form-group flex-1">
+            <label>Room Password / PIN</label>
+            <input type="text" id="roomInputPass" required placeholder="e.g. 1234">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Map / Stage Name</label>
+          <input type="text" id="roomInputMap" placeholder="e.g. Map 1: Erangel or Bermuda" value="Map 1">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="closeRoomModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btnBroadcastRoom">🚀 Send Room ID & Pass to Players</button>
         </div>
       </form>
     </div>

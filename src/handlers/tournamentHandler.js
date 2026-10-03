@@ -1141,6 +1141,50 @@ const tournamentHandler = {
   },
 
   /**
+   * Broadcasts Custom Room ID & Password privately to confirmed tournament players via DM and private match-chat!
+   */
+  broadcastRoomCredentials: async (client, tournamentId, roomId, roomPass, mapName = 'Erangel / Bermuda') => {
+    const tournament = dbQueries.getTournament(tournamentId);
+    if (!tournament) return { success: false, message: 'Tournament not found.' };
+
+    dbQueries.updateTournament(tournamentId, {
+      custom_room_id: roomId,
+      custom_room_pass: roomPass
+    });
+
+    const confirmed = dbQueries.getConfirmedParticipants(tournamentId);
+    const roomPayload = `🔐 🎮 **CUSTOM ROOM CREDENTIALS — ${tournament.title}**\n\n` +
+      `• **Game Platform:** \`${tournament.game}\`\n` +
+      `• **Map / Stage:** \`${mapName}\`\n` +
+      `• **Room ID / Name:** \`${roomId}\`\n` +
+      `• **Password / PIN:** \`${roomPass}\`\n\n` +
+      `⚡ **Instructions:** Open ${tournament.game}, tap Custom Room, enter the Room ID and Password above, and join your designated slot immediately!\n` +
+      `*Match begins in 10 minutes. Good luck!*`;
+
+    // 1. Post to Private Match Chat (Accessible only to confirmed participants)
+    if (tournament.chat_channel_id) {
+      const chatChan = await client.channels.fetch(tournament.chat_channel_id).catch(() => null);
+      if (chatChan) {
+        await chatChan.send({ content: `<@&${tournament.tournament_role_id}>\n` + roomPayload }).catch(() => null);
+      }
+    }
+
+    // 2. Send Direct Message to all confirmed players via Payment Bot
+    let dmCount = 0;
+    for (const p of confirmed) {
+      if (p.user_id && /^\d{17,20}$/.test(p.user_id)) {
+        await paymentBotService.sendDm(p.user_id, { content: roomPayload }, client).catch(() => null);
+        dmCount++;
+      }
+    }
+
+    return {
+      success: true,
+      message: `🔐 Custom Room credentials dispatched to <#${tournament.chat_channel_id}> and ${dmCount} confirmed players via private DM!`
+    };
+  },
+
+  /**
    * Broadcasts a slot available notification to the registration channel when a slot opens up.
    */
   notifySlotAvailable: async (client, tournamentId) => {

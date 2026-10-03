@@ -325,11 +325,13 @@ function renderTournaments() {
         <div class="card-actions">
           ${t.status === 'OPEN' ? `
             <button class="btn btn-sm btn-info" onclick="openAddTeamModal('${t.id}')">➕ Add Team</button>
+            <button class="btn btn-sm btn-primary" onclick="openRoomModal('${t.id}')">🔐 Room ID/Pass</button>
             <button class="btn btn-sm btn-success" onclick="startTournament('${t.id}')">⚔️ Start Tournament</button>
             <button class="btn btn-sm btn-danger-outline" onclick="openCloseTourneyModal('${t.id}')">🏁 Close</button>
           ` : ((t.status === 'STARTED' || t.status === 'ACTIVE') ? `
             <button class="btn btn-sm btn-info" onclick="openAddTeamModal('${t.id}')">➕ Add Team</button>
-            <button class="btn btn-sm btn-primary" onclick="switchTab('scoreboard')">📊 Update Scores</button>
+            <button class="btn btn-sm btn-primary" onclick="openRoomModal('${t.id}')">🔐 Room ID/Pass</button>
+            <button class="btn btn-sm btn-success" onclick="switchTab('scoreboard')">📊 Update Scores</button>
             <button class="btn btn-sm btn-danger-outline" onclick="openCloseTourneyModal('${t.id}')">🏁 Conclude</button>
           ` : `
             <span class="text-muted text-sm">🏆 Concluded: ${escapeHtml(t.winner || 'Completed')}</span>
@@ -398,6 +400,8 @@ async function handleHostTournament(e) {
     entryFee: document.getElementById('hostFee').value.trim(),
     prizePool: document.getElementById('hostPrize').value.trim(),
     rules: document.getElementById('hostRules').value.trim(),
+    schedule_date: document.getElementById('hostScheduleDate')?.value || null,
+    schedule_time: document.getElementById('hostScheduleTime')?.value || null,
     channelId: document.getElementById('hostChannel').value || null
   };
 
@@ -1429,6 +1433,48 @@ async function triggerOverlayState(state) {
     body: JSON.stringify({ tourneyId, state })
   });
   showToast(`Stream graphic trigger: ${state.toUpperCase()}`, 'success');
+}
+
+// Custom Room Modal Handlers
+function openRoomModal(tourneyId) {
+  document.getElementById('roomTourneyId').value = tourneyId;
+  document.getElementById('roomModal').classList.remove('hidden');
+}
+
+function closeRoomModal() {
+  document.getElementById('roomModal').classList.add('hidden');
+  document.getElementById('roomForm').reset();
+}
+
+async function handleBroadcastRoomSubmit(e) {
+  e.preventDefault();
+  const tourneyId = document.getElementById('roomTourneyId').value;
+  const room_id = document.getElementById('roomInputId').value.trim();
+  const room_pass = document.getElementById('roomInputPass').value.trim();
+  const map_name = document.getElementById('roomInputMap').value.trim();
+
+  const btn = document.getElementById('btnBroadcastRoom');
+  btn.disabled = true;
+  btn.innerText = '⏳ Dispatching to Players via DM...';
+
+  try {
+    const res = await apiFetch(`/api/tournaments/${tourneyId}/broadcast-room`, {
+      method: 'POST',
+      body: JSON.stringify({ room_id, room_pass, map_name })
+    });
+
+    if (res && res.success) {
+      showToast(res.message || 'Custom room credentials sent to players!', 'success');
+      closeRoomModal();
+    } else {
+      showToast(res ? res.message : 'Failed to dispatch room credentials', 'danger');
+    }
+  } catch (err) {
+    showToast('Network error broadcasting room credentials', 'danger');
+  } finally {
+    btn.disabled = false;
+    btn.innerText = '🚀 Send Room ID & Pass to Players';
+  }
 }
 
 

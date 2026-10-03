@@ -125,8 +125,18 @@ const botBridge = {
       prizePool: data.prize_pool,
       gpayInfo,
       rulesText: data.rules_text || '',
+      scheduleDate: data.schedule_date || null,
+      scheduleTime: data.schedule_time || null,
       dashboardChannel
     });
+  },
+
+  /**
+   * Broadcasts Custom Room ID & Password to confirmed participants.
+   */
+  broadcastRoomCredentials: async (tournamentId, roomId, roomPass, mapName) => {
+    const client = await botBridge.getClient();
+    return await tournamentHandler.broadcastRoomCredentials(client, tournamentId, roomId, roomPass, mapName);
   },
 
   /**

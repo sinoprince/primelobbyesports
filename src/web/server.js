@@ -114,6 +114,8 @@ app.post('/api/tournaments/create', checkAdminAuth, async (req, res) => {
     const entry_fee = req.body.entry_fee || req.body.entryFee || req.body.fee;
     const prize_pool = req.body.prize_pool || req.body.prizePool || req.body.prize;
     const rules_text = req.body.rules_text || req.body.rules || '';
+    const schedule_date = req.body.schedule_date || req.body.date || null;
+    const schedule_time = req.body.schedule_time || req.body.time || null;
     const dashboard_channel_id = req.body.dashboard_channel_id || req.body.channelId || null;
 
     if (!title || !game || !max_participants || !entry_fee || !prize_pool) {
@@ -128,10 +130,28 @@ app.post('/api/tournaments/create', checkAdminAuth, async (req, res) => {
       entry_fee,
       prize_pool,
       rules_text,
+      schedule_date,
+      schedule_time,
       dashboard_channel_id
     });
 
     res.json({ success: true, message: `Tournament #${result.tournamentId} successfully created and posted to Discord!`, tournamentId: result.tournamentId });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// Broadcast Custom Room ID & Password to confirmed participants
+app.post('/api/tournaments/:id/broadcast-room', checkAdminAuth, async (req, res) => {
+  try {
+    const tournamentId = parseInt(req.params.id, 10);
+    const { room_id, room_pass, map_name } = req.body;
+    if (!room_id || !room_pass) {
+      return res.status(400).json({ success: false, message: 'Room ID and Room Password are required.' });
+    }
+    const result = await botBridge.broadcastRoomCredentials(tournamentId, room_id, room_pass, map_name || 'Match Room');
+    if (!result.success) return res.status(400).json(result);
+    res.json(result);
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
