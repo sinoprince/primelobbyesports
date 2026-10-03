@@ -181,6 +181,8 @@ app.post('/api/tournaments/create', checkAdminAuth, async (req, res) => {
 
     const rounds = req.body.rounds || null;
     const maps = req.body.maps || null;
+    const location = req.body.location || null;
+    const round_name = req.body.round_name || null;
 
     if (!title || !game || !max_participants || !entry_fee || !prize_pool) {
       return res.status(400).json({ success: false, message: 'Please fill in all required tournament fields.' });
@@ -196,6 +198,8 @@ app.post('/api/tournaments/create', checkAdminAuth, async (req, res) => {
       rules_text,
       schedule_date,
       schedule_time,
+      location,
+      round_name,
       rounds,
       maps,
       dashboard_channel_id

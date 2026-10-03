@@ -416,16 +416,38 @@ async function handleHostTournament(e) {
   btn.disabled = true;
   btn.innerText = '⏳ Deploying to Discord...';
 
+  // Build comprehensive prize pool breakdown
+  const totalPrize = document.getElementById('hostPrize').value.trim();
+  const p1 = document.getElementById('prize1')?.value.trim();
+  const p2 = document.getElementById('prize2')?.value.trim();
+  const p3 = document.getElementById('prize3')?.value.trim();
+  const pMvp = document.getElementById('prizeMvp')?.value.trim();
+  const pCustom = document.getElementById('prizeCustom')?.value.trim();
+
+  let prizeSummary = totalPrize;
+  const prizeParts = [];
+  if (p1) prizeParts.push(`🥇 1st: ${p1}`);
+  if (p2) prizeParts.push(`🥈 2nd: ${p2}`);
+  if (p3) prizeParts.push(`🥉 3rd: ${p3}`);
+  if (pMvp) prizeParts.push(`⭐ MVP: ${pMvp}`);
+  if (pCustom) prizeParts.push(`🎖️ Extra: ${pCustom}`);
+
+  if (prizeParts.length > 0) {
+    prizeSummary = `${totalPrize} (${prizeParts.join(' | ')})`;
+  }
+
   const payload = {
     title: document.getElementById('hostTitle').value.trim(),
     game: document.getElementById('hostGame').value,
     formatMode: document.getElementById('hostMode').value,
     maxSlots: parseInt(document.getElementById('hostMax').value, 10),
     entryFee: document.getElementById('hostFee').value.trim(),
-    prizePool: document.getElementById('hostPrize').value.trim(),
+    prizePool: prizeSummary,
     rules: document.getElementById('hostRules').value.trim(),
     schedule_date: document.getElementById('hostScheduleDate')?.value || null,
     schedule_time: document.getElementById('hostScheduleTime')?.value || null,
+    location: document.getElementById('hostLocation')?.value.trim() || null,
+    round_name: document.getElementById('hostRoundName')?.value.trim() || null,
     rounds: document.getElementById('hostRounds')?.value.trim() || null,
     maps: document.getElementById('hostMaps')?.value.trim() || null,
     channelId: document.getElementById('hostChannel').value || null

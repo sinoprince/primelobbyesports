@@ -367,8 +367,10 @@ const tournamentHandler = {
           ? `📅 **Kickoff Schedule:** \`${options.scheduleDate || 'Match Day'} at ${options.scheduleTime || 'TBD'} IST\`\n`
           : '';
 
+        const locationInfo = options.location ? `📍 **Location / Server Venue:** \`${options.location}\`\n` : '';
+        const roundNameInfo = options.roundName ? `🏷️ **Current Stage / Round:** \`${options.roundName}\`\n` : '';
+        const roundsInfo = options.rounds ? `⚔️ **Rounds Structure:** \`${options.rounds}\`\n` : '';
         const mapsInfo = options.maps ? `🗺️ **Map Rotation / Arenas:** \`${options.maps}\`\n` : '';
-        const roundsInfo = options.rounds ? `⚔️ **Tournament Rounds:** \`${options.rounds}\`\n` : '';
 
         await announcementsChannel.send({
           content: `🎉 🏆 **OFFICIAL TOURNAMENT LAUNCH: ${title}**\n` +
@@ -378,9 +380,12 @@ const tournamentHandler = {
             `• 💰 **Entry Fee:** \`${entryFee}\`\n` +
             `• 👥 **Slots:** \`${maxParticipants} ${teamUnit} Max\`\n` +
             scheduleInfo +
-            mapsInfo +
+            locationInfo +
+            roundNameInfo +
             roundsInfo +
-            `• ⚖️ **League Regulations:** Premier League Competitive Rules Apply (Win = 3 Pts, Draw = 1 Pt, Official Overtime/Tiebreaker Regulations)\n\n` +
+            mapsInfo +
+            `• ⚖️ **Tournament Rules & Guidelines (Premier League-Style Regulations):**\n` +
+            `  ${options.rulesText ? options.rulesText.replace(/\n/g, '\n  ') : 'Premier League Competitive Rules Apply (Win = 3 Pts, Draw = 1 Pt, Official Overtime/Tiebreaker Regulations)'}\n\n` +
             `📌 **Official Access Links:**\n` +
             `• 📝 **Registration Desk & Slot Claim:** <#${dashboardChannel.id}>\n` +
             `• 📊 **Live Match Scoreboard & Bracket:** <#${scoreboardChannel.id}>\n` +

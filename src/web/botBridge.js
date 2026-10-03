@@ -127,6 +127,8 @@ const botBridge = {
       rulesText: data.rules_text || '',
       scheduleDate: data.schedule_date || null,
       scheduleTime: data.schedule_time || null,
+      location: data.location || null,
+      roundName: data.round_name || null,
       rounds: data.rounds || null,
       maps: data.maps || null,
       dashboardChannel

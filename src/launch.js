@@ -41,9 +41,6 @@ function spawnManagedProcess(name, scriptPath, restartDelay = 3000) {
 // 1. Launch Unified Prime Lobby Esports Bot (#8842)
 const mainBot = spawnManagedProcess('PrimeLobbyBot', path.join(__dirname, 'index.js'));
 
-// Single Bot Architecture: All payments, tournament management, and verification are unified into Prime Lobby Esports #8842
-let payBot = null;
-
 // 3. Launch Web Tournament Management Software
 const webServer = spawnManagedProcess('WebServer', path.join(__dirname, 'web/server.js'));
 
@@ -52,7 +49,6 @@ process.on('SIGINT', () => {
   isShuttingDown = true;
   console.log('\n🛑 Shutting down all bot & web instances...');
   if (mainBot) mainBot.kill();
-  if (payBot) payBot.kill();
   if (webServer) webServer.kill();
   process.exit(0);
 });
@@ -61,7 +57,6 @@ process.on('SIGTERM', () => {
   isShuttingDown = true;
   console.log('\n🛑 Terminating all bot & web instances...');
   if (mainBot) mainBot.kill();
-  if (payBot) payBot.kill();
   if (webServer) webServer.kill();
   process.exit(0);
 });

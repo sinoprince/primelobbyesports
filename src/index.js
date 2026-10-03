@@ -4,10 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const paymentBotService = require('./utils/paymentBotService');
 
-// Initialize Dedicated Payment Bot Client for DM operations
-if (process.env.PAYMENT_BOT_TOKEN) {
-  paymentBotService.init();
-}
+// Single unified bot architecture: All operations handled by Prime Lobby Esports #8842
 
 // Validate Token Presence
 if (!process.env.DISCORD_TOKEN) {
