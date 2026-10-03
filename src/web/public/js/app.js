@@ -193,9 +193,7 @@ async function initDashboard() {
   const roleDisplay = document.getElementById('currentRoleBadge');
   const userDisplay = document.getElementById('currentUserDisplay');
   if (roleDisplay) {
-    if (currentRole === 'admin') roleDisplay.innerText = 'Director / Admin Mode';
-    else if (currentRole === 'referee') roleDisplay.innerText = `Official Referee (${currentUserName})`;
-    else if (currentRole === 'manager') roleDisplay.innerText = `Team Manager (${currentUserName})`;
+    roleDisplay.innerText = 'Director / Admin Mode';
   }
   if (userDisplay) {
     userDisplay.innerText = `● ${currentUserName} (${currentRole.toUpperCase()})`;
@@ -203,7 +201,6 @@ async function initDashboard() {
 
   loadStats();
   loadChannels();
-  loadLeagues();
   loadTournaments();
   // Poll stats every 30 seconds for live updates
   setInterval(loadStats, 30000);
@@ -226,9 +223,7 @@ function switchTab(tabName) {
 
 function refreshCurrentTab() {
   loadStats();
-  if (currentTab === 'leagues') {
-    loadLeagues();
-  } else if (currentTab === 'tournaments') {
+  if (currentTab === 'tournaments') {
     loadTournaments();
   } else if (currentTab === 'participants') {
     loadParticipantsTab();
@@ -236,8 +231,6 @@ function refreshCurrentTab() {
     loadPayments();
   } else if (currentTab === 'scoreboard') {
     loadScoreboardTab();
-  } else if (currentTab === 'production') {
-    loadProductionTab();
   } else if (currentTab === 'tickets') {
     loadTickets();
   } else if (currentTab === 'announcements') {
