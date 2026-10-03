@@ -205,6 +205,8 @@ function refreshCurrentTab() {
     loadPayments();
   } else if (currentTab === 'scoreboard') {
     loadScoreboardTab();
+  } else if (currentTab === 'production') {
+    loadProductionTab();
   } else if (currentTab === 'tickets') {
     loadTickets();
   } else if (currentTab === 'announcements') {
@@ -910,6 +912,9 @@ async function handleScoreTourneyChange() {
 
   // Render Logged Matches Feed
   renderScoreboardEntries(entries, tourneyId);
+
+  // Load Matches & Pending Self-Report Submissions for TD
+  loadMatchesAndPendingApprovals(tourneyId);
 }
 
 function setupQuickWinnerListeners() {
@@ -1147,6 +1152,283 @@ async function handleSendAnnouncement(e) {
     btn.disabled = false;
     btn.innerText = '🚀 Broadcast Announcement to Discord';
   }
+}
+
+// --- TAB 4 (Extension): Match Management & Self-Reporting (TD Approval) ---
+let cachedTournamentMatches = [];
+
+async function loadMatchesAndPendingApprovals(tourneyId) {
+  if (!tourneyId) return;
+
+  const [matchesRes, pendingRes] = await Promise.all([
+    apiFetch(`/api/tournaments/${tourneyId}/matches`),
+    apiFetch(`/api/tournaments/${tourneyId}/pending-matches`)
+  ]);
+
+  const matches = (matchesRes && matchesRes.matches) || [];
+  const pending = (pendingRes && pendingRes.pendingMatches) || [];
+  cachedTournamentMatches = matches;
+
+  // 1. Populate Match Selector for Table Assignment
+  const matchSelect = document.getElementById('matchSelectForTable');
+  if (matchSelect) {
+    if (matches.length === 0) {
+      matchSelect.innerHTML = '<option value="">No fixtures yet. Click "Create Match" below.</option>';
+      document.getElementById('displayMatchCode').value = '';
+    } else {
+      matchSelect.innerHTML = '<option value="">Select match fixture...</option>' + matches.map(m => {
+        const tableTxt = m.table_number ? `[Table ${m.table_number}]` : '[Unassigned]';
+        return `<option value="${m.id}" data-code="${m.match_code}">${tableTxt} ${m.round_name}: ${m.player1} vs ${m.player2} (${m.match_code})</option>`;
+      }).join('');
+    }
+  }
+
+  // 2. Render Pending Self-Reported Matches for Director Review & Approval
+  const pendingFeed = document.getElementById('pendingMatchesList');
+  const pendingBadge = document.getElementById('pendingMatchesCount');
+
+  if (pendingBadge) {
+    pendingBadge.innerText = `${pending.length} Pending`;
+    pendingBadge.className = pending.length > 0 ? 'badge badge-warning' : 'badge badge-closed';
+  }
+
+  if (pendingFeed) {
+    if (pending.length === 0) {
+      pendingFeed.innerHTML = `
+        <div class="empty-state" style="padding: 24px;">
+          <span style="font-size: 1.8rem; display: block; margin-bottom: 6px;">✅</span>
+          No pending match submissions from players.<br>
+          <span class="text-muted text-sm">When players finish and submit on mobile, they appear here for 1-click approval.</span>
+        </div>
+      `;
+    } else {
+      pendingFeed.innerHTML = pending.map(m => `
+        <div class="score-match-card" style="border-left: 4px solid #f59e0b;">
+          <div class="score-match-header">
+            <span class="score-round-title">⏳ <strong>${escapeHtml(m.round_name)}</strong> — Code: <code>${m.match_code}</code></span>
+            <span class="badge badge-warning">Awaiting Approval</span>
+          </div>
+          <div class="score-match-body">
+            <div class="score-vs-teams">
+              <strong>${escapeHtml(m.player1)}</strong> vs <strong>${escapeHtml(m.player2)}</strong>
+              ${m.table_number ? `<span class="table-tag" style="margin-left: 8px; font-size: 0.75rem; background: #2563eb; color: #fff; padding: 2px 6px; border-radius: 4px;">Table ${m.table_number}</span>` : ''}
+            </div>
+            <div style="margin-top: 6px;">
+              <span class="score-badge-result">Reported Score: ${escapeHtml(m.submitted_score || `${m.player1_score} - ${m.player2_score}`)}</span>
+            </div>
+          </div>
+          <div class="score-match-winner" style="display: flex; justify-content: space-between; align-items: center;">
+            <span>Reported Winner: 🏆 <strong>${escapeHtml(m.submitted_winner || m.player1)}</strong></span>
+            <button class="btn btn-xs btn-success" onclick="openApproveModal('${m.id}', '${escapeHtml(m.round_name)}', '${escapeHtml(m.player1)}', '${escapeHtml(m.player2)}', '${escapeHtml(m.submitted_score || '')}', '${escapeHtml(m.submitted_winner || m.player1)}')">
+              ✅ Review & Approve
+            </button>
+          </div>
+        </div>
+      `).join('');
+    }
+  }
+}
+
+function handleMatchSelectChange() {
+  const select = document.getElementById('matchSelectForTable');
+  const codeInput = document.getElementById('displayMatchCode');
+  const selectedOpt = select.options[select.selectedIndex];
+  if (selectedOpt && selectedOpt.dataset.code) {
+    codeInput.value = selectedOpt.dataset.code;
+  } else {
+    codeInput.value = '';
+  }
+}
+
+async function handleAssignTable(e) {
+  e.preventDefault();
+  const matchId = document.getElementById('matchSelectForTable').value;
+  const tableNumber = document.getElementById('assignTableNumber').value.trim();
+
+  if (!matchId || !tableNumber) {
+    showToast('Please select match fixture and enter Table number', 'warning');
+    return;
+  }
+
+  const btn = document.getElementById('btnAssignTable');
+  btn.disabled = true;
+  btn.innerText = '📲 Sending Match Call & Mobile Link...';
+
+  try {
+    const res = await apiFetch(`/api/matches/${matchId}/assign-table`, {
+      method: 'POST',
+      body: JSON.stringify({ table_number: tableNumber })
+    });
+
+    if (res && res.success) {
+      showToast(res.message || 'Table assigned & direct live-scoring link dispatched to players!', 'success');
+      const tourneyId = document.getElementById('scoreTourneySelect').value;
+      loadMatchesAndPendingApprovals(tourneyId);
+      document.getElementById('assignTableNumber').value = '';
+    } else {
+      showToast(res ? res.message : 'Failed to assign table', 'danger');
+    }
+  } catch (err) {
+    showToast('Network error assigning table', 'danger');
+  } finally {
+    btn.disabled = false;
+    btn.innerText = '📲 Assign Table & Send Mobile Live-Score Link';
+  }
+}
+
+// Create Match Modal Helpers
+function openCreateMatchModal() {
+  populateTournamentDropdowns();
+  const sel = document.getElementById('modalMatchTourneySelect');
+  const currentTourney = document.getElementById('scoreTourneySelect').value;
+  if (sel) {
+    sel.innerHTML = cachedTournaments.map(t => `<option value="${t.id}" ${t.id == currentTourney ? 'selected' : ''}>#${t.id} - ${escapeHtml(t.title || t.name)}</option>`).join('');
+  }
+  document.getElementById('createMatchModal').classList.remove('hidden');
+}
+
+function closeCreateMatchModal() {
+  document.getElementById('createMatchModal').classList.add('hidden');
+}
+
+async function handleCreateMatchSubmit(e) {
+  e.preventDefault();
+  const tourneyId = document.getElementById('modalMatchTourneySelect').value;
+  const payload = {
+    round_name: document.getElementById('modalMatchRound').value.trim(),
+    player1: document.getElementById('modalMatchP1').value.trim(),
+    player2: document.getElementById('modalMatchP2').value.trim() || 'TBD',
+    table_number: document.getElementById('modalMatchTable').value.trim() || null
+  };
+
+  try {
+    const res = await apiFetch(`/api/tournaments/${tourneyId}/matches/create`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+
+    if (res && res.success) {
+      showToast(`Match fixture created with Code: ${res.match.match_code}`, 'success');
+      closeCreateMatchModal();
+      document.getElementById('modalMatchRound').value = '';
+      document.getElementById('modalMatchP1').value = '';
+      document.getElementById('modalMatchP2').value = '';
+      document.getElementById('modalMatchTable').value = '';
+      loadMatchesAndPendingApprovals(tourneyId);
+    } else {
+      showToast(res ? res.message : 'Failed to create match fixture', 'danger');
+    }
+  } catch (err) {
+    showToast('Network error creating match fixture', 'danger');
+  }
+}
+
+// Approve Self-Report Modal Helpers
+function openApproveModal(matchId, round, p1, p2, score, winner) {
+  document.getElementById('approveMatchId').value = matchId;
+  document.getElementById('approveMatchTitle').innerText = `${round}: ${p1} vs ${p2}`;
+  document.getElementById('approveMatchReportedBy').innerText = `Reported winner: ${winner} | Submitted Score: ${score || 'N/A'}`;
+  document.getElementById('approveMatchScore').value = score || '1 - 0';
+  document.getElementById('approveMatchWinner').value = winner || p1;
+  document.getElementById('approveMatchModal').classList.remove('hidden');
+}
+
+function closeApproveMatchModal() {
+  document.getElementById('approveMatchModal').classList.add('hidden');
+}
+
+async function handleApproveMatchSubmit(e) {
+  e.preventDefault();
+  const matchId = document.getElementById('approveMatchId').value;
+  const final_score = document.getElementById('approveMatchScore').value.trim();
+  const final_winner = document.getElementById('approveMatchWinner').value.trim();
+
+  try {
+    const res = await apiFetch(`/api/matches/${matchId}/approve`, {
+      method: 'POST',
+      body: JSON.stringify({ final_score, final_winner })
+    });
+
+    if (res && res.success) {
+      showToast('Match APPROVED! Table released, bracket advanced, & live scoreboard updated!', 'success');
+      closeApproveMatchModal();
+      const tourneyId = document.getElementById('scoreTourneySelect').value;
+      handleScoreTourneyChange();
+    } else {
+      showToast(res ? res.message : 'Failed to approve match', 'danger');
+    }
+  } catch (err) {
+    showToast('Network error approving match', 'danger');
+  }
+}
+
+// --- TAB: Esports Broadcast & Production Suite (TournaLink + WASP3D) ---
+function loadProductionTab() {
+  populateTournamentDropdowns();
+  const sel = document.getElementById('prodTourneySelect');
+  const scoreSel = document.getElementById('scoreTourneySelect');
+  if (sel && scoreSel && scoreSel.value) {
+    sel.value = scoreSel.value;
+  } else if (sel && sel.options.length > 1) {
+    sel.selectedIndex = 1;
+  }
+  handleProductionTourneyChange();
+}
+
+async function handleProductionTourneyChange() {
+  const tourneyId = document.getElementById('prodTourneySelect').value;
+  const origin = window.location.origin;
+
+  document.getElementById('urlOverlayLeaderboard').value = `${origin}/overlay/leaderboard?tourneyId=${tourneyId}`;
+  document.getElementById('urlOverlayTicker').value = `${origin}/overlay/ticker?tourneyId=${tourneyId}`;
+  document.getElementById('urlOverlayWinner').value = `${origin}/overlay/winner?tourneyId=${tourneyId}`;
+
+  // Populate active matches dropdown for live stream ticker
+  const matchRes = await apiFetch(`/api/tournaments/${tourneyId}/matches`);
+  const matches = (matchRes && matchRes.matches) || [];
+  const prodMatchSel = document.getElementById('prodMatchSelector');
+  if (prodMatchSel) {
+    if (matches.length === 0) {
+      prodMatchSel.innerHTML = '<option value="">No active matches found.</option>';
+    } else {
+      prodMatchSel.innerHTML = '<option value="">Select match to display on stream ticker...</option>' + matches.map(m => `
+        <option value="${m.id}">${m.round_name}: ${m.player1} vs ${m.player2} [Table: ${m.table_number || 'N/A'}] (Score: ${m.player1_score} - ${m.player2_score})</option>
+      `).join('');
+    }
+  }
+}
+
+function openOverlayInNewTab(type) {
+  const tourneyId = document.getElementById('prodTourneySelect').value;
+  window.open(`/overlay/${type}?tourneyId=${tourneyId}`, '_blank');
+}
+
+function copyOverlayUrl(inputId) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  input.select();
+  navigator.clipboard.writeText(input.value);
+  showToast('Overlay URL copied! Paste into OBS as a Browser Source (1920x1080).', 'success');
+}
+
+async function updateBroadcastActiveMatch() {
+  const matchId = document.getElementById('prodMatchSelector').value;
+  if (!matchId) return;
+  const tourneyId = document.getElementById('prodTourneySelect').value;
+  await apiFetch('/api/overlay/set-active-match', {
+    method: 'POST',
+    body: JSON.stringify({ tourneyId, matchId })
+  });
+  showToast('Active stream match updated on OBS ticker!', 'info');
+}
+
+async function triggerOverlayState(state) {
+  const tourneyId = document.getElementById('prodTourneySelect').value;
+  await apiFetch('/api/overlay/set-state', {
+    method: 'POST',
+    body: JSON.stringify({ tourneyId, state })
+  });
+  showToast(`Stream graphic trigger: ${state.toUpperCase()}`, 'success');
 }
 
 

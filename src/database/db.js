@@ -39,6 +39,7 @@ function loadDatabase() {
       inMemoryData.tournaments = inMemoryData.tournaments || [];
       inMemoryData.tournament_participants = inMemoryData.tournament_participants || [];
       inMemoryData.scoreboard_entries = inMemoryData.scoreboard_entries || [];
+      inMemoryData.matches = inMemoryData.matches || [];
       inMemoryData.payments = inMemoryData.payments || [];
       inMemoryData.invoices = inMemoryData.invoices || [];
       inMemoryData.tickets = inMemoryData.tickets || [];
@@ -46,10 +47,12 @@ function loadDatabase() {
         tournament_id: 0,
         payment_id: 1000,
         invoice_id: 5000,
+        match_id: 100,
         ticket_numbers: {}
       };
       if (inMemoryData.counters.payment_id === undefined) inMemoryData.counters.payment_id = 1000;
       if (inMemoryData.counters.invoice_id === undefined) inMemoryData.counters.invoice_id = 5000;
+      if (inMemoryData.counters.match_id === undefined) inMemoryData.counters.match_id = 100;
     } catch (err) {
       console.error('[Database] Failed to parse existing storage.json, initializing fresh state:', err);
       inMemoryData = JSON.parse(JSON.stringify(defaultState));
@@ -300,6 +303,162 @@ const dbQueries = {
     data.scoreboard_entries = data.scoreboard_entries.filter(e => e.id !== eId);
     saveDatabase();
     return data.scoreboard_entries.length < initial;
+  },
+
+  // Match & Self-Reporting System
+  createMatch: (matchData) => {
+    const data = loadDatabase();
+    data.counters.match_id = (data.counters.match_id || 100) + 1;
+    const matchId = data.counters.match_id;
+
+    // Generate unique 6-character match code (e.g., M-4X9B2)
+    const code = matchData.match_code || `M-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+
+    const newMatch = {
+      id: matchId,
+      match_code: code,
+      tournament_id: Number(matchData.tournament_id),
+      round_name: matchData.round_name || 'Round 1',
+      bracket_pos: matchData.bracket_pos || null, // e.g., 'QF-1', 'SF-1', 'F-1'
+      next_match_id: matchData.next_match_id ? Number(matchData.next_match_id) : null,
+      player1: matchData.player1, // Name or Team Name
+      player1_id: matchData.player1_id || null, // Discord User ID or Player ID
+      player1_score: matchData.player1_score !== undefined ? matchData.player1_score : 0,
+      player2: matchData.player2 || 'TBD',
+      player2_id: matchData.player2_id || null,
+      player2_score: matchData.player2_score !== undefined ? matchData.player2_score : 0,
+      table_number: matchData.table_number || null, // Table / Station / Room assigned by TD
+      status: matchData.status || 'SCHEDULED', // SCHEDULED, ASSIGNED, IN_PROGRESS, PENDING_APPROVAL, COMPLETED
+      assigned_at: matchData.assigned_at || null,
+      assigned_by: matchData.assigned_by || null,
+      live_score: matchData.live_score || '',
+      submitted_score: matchData.submitted_score || null,
+      submitted_winner: matchData.submitted_winner || null,
+      submitted_by: matchData.submitted_by || null,
+      submitted_at: null,
+      winner: matchData.winner || null,
+      approved_by: null,
+      approved_at: null,
+      created_at: new Date().toISOString()
+    };
+
+    data.matches.push(newMatch);
+    saveDatabase();
+    return newMatch;
+  },
+
+  getMatch: (matchId) => {
+    const data = loadDatabase();
+    return data.matches.find(m => m.id === Number(matchId) || m.match_code === String(matchId)) || null;
+  },
+
+  getMatchByCode: (code) => {
+    const data = loadDatabase();
+    const clean = String(code).trim().toUpperCase();
+    return data.matches.find(m => m.match_code.toUpperCase() === clean) || null;
+  },
+
+  getTournamentMatches: (tournamentId) => {
+    const data = loadDatabase();
+    const tId = Number(tournamentId);
+    return data.matches.filter(m => m.tournament_id === tId);
+  },
+
+  getPendingApprovalMatches: (tournamentId = null) => {
+    const data = loadDatabase();
+    return data.matches.filter(m => {
+      const isPending = m.status === 'PENDING_APPROVAL';
+      return tournamentId ? isPending && m.tournament_id === Number(tournamentId) : isPending;
+    });
+  },
+
+  assignMatchToTable: (matchId, tableNumber, directorId) => {
+    const data = loadDatabase();
+    const match = data.matches.find(m => m.id === Number(matchId) || m.match_code === String(matchId));
+    if (!match) return null;
+
+    match.table_number = tableNumber;
+    match.status = 'ASSIGNED';
+    match.assigned_at = new Date().toISOString();
+    match.assigned_by = directorId;
+    saveDatabase();
+    return match;
+  },
+
+  updateMatchLiveScore: (matchId, { player1_score, player2_score, live_score, updated_by }) => {
+    const data = loadDatabase();
+    const match = data.matches.find(m => m.id === Number(matchId) || m.match_code === String(matchId));
+    if (!match) return null;
+
+    if (player1_score !== undefined) match.player1_score = player1_score;
+    if (player2_score !== undefined) match.player2_score = player2_score;
+    if (live_score !== undefined) match.live_score = live_score;
+    if (match.status === 'SCHEDULED' || match.status === 'ASSIGNED') {
+      match.status = 'IN_PROGRESS';
+    }
+    match.last_updated_by = updated_by;
+    match.last_updated_at = new Date().toISOString();
+    saveDatabase();
+    return match;
+  },
+
+  submitMatchSelfReport: (matchId, { submitted_score, submitted_winner, submitted_by }) => {
+    const data = loadDatabase();
+    const match = data.matches.find(m => m.id === Number(matchId) || m.match_code === String(matchId));
+    if (!match) return null;
+
+    match.submitted_score = submitted_score;
+    match.submitted_winner = submitted_winner;
+    match.submitted_by = submitted_by;
+    match.submitted_at = new Date().toISOString();
+    match.status = 'PENDING_APPROVAL';
+    saveDatabase();
+    return match;
+  },
+
+  approveMatchScore: (matchId, { approved_by, final_score = null, final_winner = null }) => {
+    const data = loadDatabase();
+    const match = data.matches.find(m => m.id === Number(matchId) || m.match_code === String(matchId));
+    if (!match) return null;
+
+    const winner = final_winner || match.submitted_winner || match.player1;
+    const score = final_score || match.submitted_score || `${match.player1_score} - ${match.player2_score}`;
+
+    match.winner = winner;
+    match.status = 'COMPLETED';
+    match.approved_by = approved_by;
+    match.approved_at = new Date().toISOString();
+
+    // Release table
+    const releasedTable = match.table_number;
+    match.table_released = true;
+
+    // Advance winner in bracket if next_match_id exists
+    let nextMatch = null;
+    if (match.next_match_id) {
+      nextMatch = data.matches.find(m => m.id === match.next_match_id);
+      if (nextMatch) {
+        if (!nextMatch.player1 || nextMatch.player1 === 'TBD') {
+          nextMatch.player1 = winner;
+          nextMatch.player1_id = match.submitted_by;
+        } else if (!nextMatch.player2 || nextMatch.player2 === 'TBD') {
+          nextMatch.player2 = winner;
+          nextMatch.player2_id = match.submitted_by;
+        }
+      }
+    }
+
+    saveDatabase();
+    return { match, releasedTable, nextMatch, winner, score };
+  },
+
+  deleteMatch: (matchId) => {
+    const data = loadDatabase();
+    const mId = Number(matchId);
+    const initial = data.matches.length;
+    data.matches = data.matches.filter(m => m.id !== mId);
+    saveDatabase();
+    return data.matches.length < initial;
   },
 
 

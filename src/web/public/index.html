@@ -48,6 +48,7 @@
         <button class="nav-tab" onclick="switchTab('participants')">👥 Teams & Slots</button>
         <button class="nav-tab" onclick="switchTab('payments')">💳 Payment Ledger</button>
         <button class="nav-tab" onclick="switchTab('scoreboard')">📊 Match Scoreboard</button>
+        <button class="nav-tab" onclick="switchTab('production')">🎬 Esports Broadcast (OBS/TournaLink)</button>
         <button class="nav-tab" onclick="switchTab('tickets')">🎫 Support Tickets</button>
         <button class="nav-tab" onclick="switchTab('announcements')">📢 Announcements</button>
       </nav>
@@ -315,6 +316,183 @@
               <div class="empty-state" style="padding: 30px;">
                 Select a tournament above to inspect recorded fixtures and live leaderboard standings.
               </div>
+            </div>
+          </div>
+        <!-- Match Management & Tournament Builder Row (Tables, Codes, Self-Reports & Director Approvals) -->
+        <div class="scoreboard-layout-grid" style="margin-top: 20px;">
+          <!-- TD Controls: Assign Match to Table / Station -->
+          <div class="scoreboard-form-card">
+            <div class="card-header" style="margin-bottom: 12px;">
+              <h3 style="margin: 0; font-size: 1.15rem; color: #fff;">📍 Assign Match to Table (TD Call)</h3>
+              <span class="badge badge-open">Auto SMS / DM Link</span>
+            </div>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 14px;">
+              Assigning a table sends an automated DM/text to both players with the match details and unique live scoring link for mobile self-reporting.
+            </p>
+
+            <form id="assignTableForm" onsubmit="handleAssignTable(event)">
+              <div class="form-group">
+                <label>Select Match Fixture</label>
+                <select id="matchSelectForTable" required onchange="handleMatchSelectChange()">
+                  <option value="">Select or Create Match...</option>
+                </select>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group flex-1">
+                  <label>Assign Table / Station / Room</label>
+                  <input type="text" id="assignTableNumber" placeholder="e.g. Table 1 or Station A" required>
+                </div>
+                <div class="form-group flex-1">
+                  <label>Match Code</label>
+                  <input type="text" id="displayMatchCode" readonly placeholder="Auto-generated" style="background: rgba(255,255,255,0.05); color: #00E676; font-family: monospace;">
+                </div>
+              </div>
+
+              <button type="submit" id="btnAssignTable" class="btn btn-primary btn-block">
+                📲 Assign Table & Send Mobile Live-Score Link
+              </button>
+            </form>
+
+            <!-- Quick Create Match Button -->
+            <div style="margin-top: 15px; border-top: 1px solid var(--border-color); padding-top: 12px; display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-size: 0.8rem; color: var(--text-muted);">Need a new match fixture?</span>
+              <button type="button" class="btn btn-xs btn-outline" onclick="openCreateMatchModal()">➕ Create Match</button>
+            </div>
+          </div>
+
+          <!-- Pending Self-Reported Scores for Tournament Director Approval -->
+          <div class="scoreboard-results-card">
+            <div class="card-header" style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+              <h3 style="margin: 0; font-size: 1.15rem; color: #fff;">📋 Pending Scores (Awaiting Approval)</h3>
+              <span id="pendingMatchesCount" class="badge badge-closed">0 Pending</span>
+            </div>
+
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px;">
+              Scores reported by players on mobile. Approve to release table, advance bracket, and broadcast results!
+            </p>
+
+            <div id="pendingMatchesList" class="scoreboard-feed">
+              <div class="empty-state" style="padding: 24px;">
+                No pending match submissions from players.
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB: Esports Broadcast & Production Suite (TournaLink + WASP3D Live Overlays) -->
+      <section id="tab-production" class="tab-pane">
+        <div class="pane-header">
+          <div>
+            <h2>🎬 Esports Broadcast & Stream Production Suite</h2>
+            <p>Automate live stream graphics, leaderboards, MVP callouts & ticker overlays for <strong>OBS Studio, vMix, and WASP3D</strong>.</p>
+          </div>
+          <div style="display: flex; gap: 10px; align-items: center;">
+            <div class="select-wrapper">
+              <select id="prodTourneySelect" onchange="handleProductionTourneyChange()">
+                <option value="">Select Tournament for Broadcast...</option>
+              </select>
+            </div>
+            <button class="btn btn-sm btn-outline" onclick="loadProductionTab()">🔄 Refresh Production</button>
+          </div>
+        </div>
+
+        <!-- Broadcast Overlays Grid -->
+        <div class="scoreboard-layout-grid">
+          <!-- Column 1: OBS / vMix Browser Sources & Quick Links -->
+          <div class="scoreboard-form-card">
+            <div class="card-header" style="margin-bottom: 12px;">
+              <h3 style="margin: 0; font-size: 1.15rem; color: #fff;">📡 Live OBS / vMix Browser Sources</h3>
+              <span class="badge badge-open">Zero Latency HTML5</span>
+            </div>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 15px;">
+              Copy these URLs and paste them into <strong>OBS Studio / vMix as a "Browser Source" (1920x1080)</strong>. Overlays update in real-time as match scores are reported or logged.
+            </p>
+
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <!-- Overlay 1: Live Leaderboard / Standings -->
+              <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                  <strong style="color: #00E676; font-size: 0.95rem;">📊 Full Standings & Leaderboard (1080p)</strong>
+                  <button class="btn btn-xs btn-outline" onclick="openOverlayInNewTab('leaderboard')">👁️ Preview</button>
+                </div>
+                <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0 0 8px;">
+                  PUBG/BGMI 3-Map points table, Free Fire rankings, or tournament brackets.
+                </p>
+                <div style="display: flex; gap: 6px;">
+                  <input type="text" id="urlOverlayLeaderboard" readonly style="flex: 1; font-size: 0.8rem; background: #000; color: #58a6ff; font-family: monospace;" value="/overlay/leaderboard">
+                  <button class="btn btn-xs btn-primary" onclick="copyOverlayUrl('urlOverlayLeaderboard')">📋 Copy</button>
+                </div>
+              </div>
+
+              <!-- Overlay 2: Lower-Third Matchup Ticker -->
+              <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                  <strong style="color: #3b82f6; font-size: 0.95rem;">⚔️ Lower-Third VS Match Ticker</strong>
+                  <button class="btn btn-xs btn-outline" onclick="openOverlayInNewTab('ticker')">👁️ Preview</button>
+                </div>
+                <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0 0 8px;">
+                  Shows current active match, table assignment, live score, and team names.
+                </p>
+                <div style="display: flex; gap: 6px;">
+                  <input type="text" id="urlOverlayTicker" readonly style="flex: 1; font-size: 0.8rem; background: #000; color: #58a6ff; font-family: monospace;" value="/overlay/ticker">
+                  <button class="btn btn-xs btn-primary" onclick="copyOverlayUrl('urlOverlayTicker')">📋 Copy</button>
+                </div>
+              </div>
+
+              <!-- Overlay 3: Winner & MVP Showcase -->
+              <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                  <strong style="color: #f59e0b; font-size: 0.95rem;">👑 Winner / WWCD / MVP Showcase</strong>
+                  <button class="btn btn-xs btn-outline" onclick="openOverlayInNewTab('winner')">👁️ Preview</button>
+                </div>
+                <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0 0 8px;">
+                  Dramatic victory card, Chicken Dinner (WWCD) celebration, and MVP kill leaders.
+                </p>
+                <div style="display: flex; gap: 6px;">
+                  <input type="text" id="urlOverlayWinner" readonly style="flex: 1; font-size: 0.8rem; background: #000; color: #58a6ff; font-family: monospace;" value="/overlay/winner">
+                  <button class="btn btn-xs btn-primary" onclick="copyOverlayUrl('urlOverlayWinner')">📋 Copy</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Column 2: TournaLink & WASP3D Live Production Control Desk -->
+          <div class="scoreboard-results-card">
+            <div class="card-header" style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+              <h3 style="margin: 0; font-size: 1.15rem; color: #fff;">🎛️ Live Stream Director Desk</h3>
+              <span class="badge badge-open">ON AIR</span>
+            </div>
+
+            <div style="margin-bottom: 14px;">
+              <label style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Active Broadcast Match</label>
+              <select id="prodMatchSelector" style="margin-top: 6px;" onchange="updateBroadcastActiveMatch()">
+                <option value="">Select match to display on stream ticker...</option>
+              </select>
+            </div>
+
+            <!-- Quick Broadcast Triggers -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px;">
+              <button class="btn btn-outline" onclick="triggerOverlayState('standings')">
+                📺 Show Standings Table
+              </button>
+              <button class="btn btn-outline" onclick="triggerOverlayState('match')">
+                ⚔️ Show Active Match Ticker
+              </button>
+              <button class="btn btn-outline" onclick="triggerOverlayState('mvp')">
+                ⭐ Trigger MVP / Winner Graphic
+              </button>
+              <button class="btn btn-outline" onclick="triggerOverlayState('clear')">
+                🧹 Clear Stream Overlay
+              </button>
+            </div>
+
+            <div style="background: rgba(0,230,118,0.05); border: 1px solid rgba(0,230,118,0.2); border-radius: 8px; padding: 14px;">
+              <h4 style="margin: 0 0 6px; color: #00E676; font-size: 0.95rem;">💡 WASP3D & TournaLink Integration Ready</h4>
+              <p style="margin: 0; font-size: 0.8rem; color: var(--text-muted); line-height: 1.4;">
+                Data is served via JSON API at <code>/api/overlay/data</code>. You can link this directly to WASP3D via Web API or Excel/CSV ODBC driver, or plug the URL into OBS Studio Browser Source.
+              </p>
             </div>
           </div>
         </div>
@@ -587,6 +765,75 @@
         <div class="modal-footer">
           <button type="button" class="btn btn-outline" onclick="closeCloseTourneyModal()">Cancel</button>
           <button type="submit" class="btn btn-danger">Conclude Tournament</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Create Match Modal -->
+  <div id="createMatchModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>⚔️ Create Match Fixture</h3>
+        <button class="modal-close" onclick="closeCreateMatchModal()">&times;</button>
+      </div>
+      <form id="createMatchForm" onsubmit="handleCreateMatchSubmit(event)">
+        <div class="form-group">
+          <label>Tournament</label>
+          <select id="modalMatchTourneySelect" required></select>
+        </div>
+        <div class="form-group">
+          <label>Stage / Round Name</label>
+          <input type="text" id="modalMatchRound" placeholder="e.g. Round 1, Quarterfinals 1, or Map 1" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label>Team 1 / Player 1</label>
+            <input type="text" id="modalMatchP1" required placeholder="Team 1 name">
+          </div>
+          <div class="form-group flex-1">
+            <label>Team 2 / Player 2</label>
+            <input type="text" id="modalMatchP2" placeholder="Team 2 name or TBD">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Initial Table / Station (Optional)</label>
+          <input type="text" id="modalMatchTable" placeholder="e.g. Table 1">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="closeCreateMatchModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create Match Fixture</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Approve Match Report Modal -->
+  <div id="approveMatchModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>✅ Review & Approve Player Self-Report</h3>
+        <button class="modal-close" onclick="closeApproveMatchModal()">&times;</button>
+      </div>
+      <form id="approveMatchForm" onsubmit="handleApproveMatchSubmit(event)">
+        <input type="hidden" id="approveMatchId">
+        <div style="background: rgba(0,230,118,0.1); border: 1px solid #00E676; border-radius: 8px; padding: 12px; margin-bottom: 14px;">
+          <h4 id="approveMatchTitle" style="margin: 0 0 6px; color: #fff;">Matchup</h4>
+          <div id="approveMatchReportedBy" style="font-size: 0.85rem; color: #c9d1d9;">Reported by: Player</div>
+        </div>
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label>Final Score to Confirm</label>
+            <input type="text" id="approveMatchScore" required>
+          </div>
+          <div class="form-group flex-1">
+            <label>Confirmed Winner</label>
+            <input type="text" id="approveMatchWinner" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="closeApproveMatchModal()">Cancel</button>
+          <button type="submit" class="btn btn-success">✅ Confirm & Release Table</button>
         </div>
       </form>
     </div>

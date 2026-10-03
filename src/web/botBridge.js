@@ -402,6 +402,42 @@ const botBridge = {
   },
 
   /**
+   * Assigns a match to a table/station and sends player notifications.
+   */
+  assignMatchTable: async (matchId, tableNumber) => {
+    const client = await botBridge.getClient();
+    const guild = await botBridge.getGuild();
+    const adminMember = (guild && guild.members && guild.members.me) ? guild.members.me : { id: 'web-admin', user: { tag: 'Tournament Director', username: 'Tournament Director' } };
+    return await tournamentHandler.assignMatchTable(client, matchId, tableNumber, adminMember);
+  },
+
+  /**
+   * Updates live score during gameplay.
+   */
+  updateMatchLiveScore: async (matchId, data) => {
+    const client = await botBridge.getClient();
+    return await tournamentHandler.updateMatchScoreLive(client, matchId, data);
+  },
+
+  /**
+   * Self-reports score from player mobile device.
+   */
+  submitMatchSelfReport: async (matchId, data) => {
+    const client = await botBridge.getClient();
+    return await tournamentHandler.submitMatchReport(client, matchId, data);
+  },
+
+  /**
+   * Approves a self-reported score by Tournament Director.
+   */
+  approveMatchReport: async (matchId, overrideScore = null, overrideWinner = null) => {
+    const client = await botBridge.getClient();
+    const guild = await botBridge.getGuild();
+    const adminMember = (guild && guild.members && guild.members.me) ? guild.members.me : { id: 'web-admin', user: { tag: 'Tournament Director', username: 'Tournament Director' } };
+    return await tournamentHandler.approveMatchReport(client, matchId, adminMember, overrideScore, overrideWinner);
+  },
+
+  /**
    * Sends an official announcement to any Discord channel from the web panel.
    */
   sendAnnouncement: async ({ channelId, title, message, ping = 'none', color = '#FFA500', imageUrl = null }) => {

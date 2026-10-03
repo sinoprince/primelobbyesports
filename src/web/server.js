@@ -309,6 +309,136 @@ app.delete('/api/tournaments/:id/score/:entryId', checkAdminAuth, async (req, re
   }
 });
 
+// 6. Scoreboard & Match Self-Reporting Endpoints
+app.get('/api/tournaments/:id/matches', async (req, res) => {
+  try {
+    const tournamentId = parseInt(req.params.id, 10);
+    const matches = dbQueries.getTournamentMatches(tournamentId);
+    res.json({ success: true, matches });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.post('/api/tournaments/:id/matches/create', checkAdminAuth, async (req, res) => {
+  try {
+    const tournamentId = parseInt(req.params.id, 10);
+    const { round_name, bracket_pos, player1, player1_id, player2, player2_id, table_number, next_match_id } = req.body;
+    if (!player1) {
+      return res.status(400).json({ success: false, message: 'Player/Team 1 is required.' });
+    }
+    const newMatch = dbQueries.createMatch({
+      tournament_id: tournamentId,
+      round_name: round_name || 'Round 1',
+      bracket_pos,
+      player1,
+      player1_id,
+      player2: player2 || 'TBD',
+      player2_id,
+      table_number,
+      next_match_id
+    });
+    res.json({ success: true, match: newMatch });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// Table Assignment by TD -> Sends notification text/DM to both players with link
+app.post('/api/matches/:id/assign-table', checkAdminAuth, async (req, res) => {
+  try {
+    const matchId = req.params.id;
+    const { table_number } = req.body;
+    if (!table_number) {
+      return res.status(400).json({ success: false, message: 'Table number is required.' });
+    }
+    const result = await botBridge.assignMatchTable(matchId, table_number);
+    if (!result.success) return res.status(400).json(result);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// Public / Mobile Live Score Query by Match Code
+app.get('/api/live-score/:code', (req, res) => {
+  try {
+    const code = req.params.code;
+    const match = dbQueries.getMatchByCode(code);
+    if (!match) return res.status(404).json({ success: false, message: 'Match code not found.' });
+
+    const tournament = dbQueries.getTournament(match.tournament_id);
+    res.json({ success: true, match, tournament });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// Real-time score ticker update from player device
+app.post('/api/live-score/:code/update', async (req, res) => {
+  try {
+    const code = req.params.code;
+    const { player1_score, player2_score, live_score, updated_by } = req.body;
+    const match = dbQueries.getMatchByCode(code);
+    if (!match) return res.status(404).json({ success: false, message: 'Match not found.' });
+
+    const result = await botBridge.updateMatchLiveScore(match.id, {
+      player1_score,
+      player2_score,
+      live_score,
+      updated_by
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// Player submits final score to TD for approval
+app.post('/api/live-score/:code/submit', async (req, res) => {
+  try {
+    const code = req.params.code;
+    const { submitted_score, submitted_winner, submitted_by } = req.body;
+    if (!submitted_score || !submitted_winner) {
+      return res.status(400).json({ success: false, message: 'Score and Winner are required.' });
+    }
+    const match = dbQueries.getMatchByCode(code);
+    if (!match) return res.status(404).json({ success: false, message: 'Match not found.' });
+
+    const result = await botBridge.submitMatchSelfReport(match.id, {
+      submitted_score,
+      submitted_winner,
+      submitted_by: submitted_by || 'Player'
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// TD review and approve pending scores in Tournament Builder
+app.get('/api/tournaments/:id/pending-matches', checkAdminAuth, (req, res) => {
+  try {
+    const tournamentId = parseInt(req.params.id, 10);
+    const pendingMatches = dbQueries.getPendingApprovalMatches(tournamentId);
+    res.json({ success: true, pendingMatches });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.post('/api/matches/:id/approve', checkAdminAuth, async (req, res) => {
+  try {
+    const matchId = req.params.id;
+    const { final_score, final_winner } = req.body;
+    const result = await botBridge.approveMatchReport(matchId, final_score, final_winner);
+    if (!result.success) return res.status(400).json(result);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // 7. Payments Endpoints
 app.get('/api/payments', checkAdminAuth, (req, res) => {
   try {
@@ -410,6 +540,98 @@ app.post('/api/setup', checkAdminAuth, async (req, res) => {
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
+});
+
+// Dedicated Mobile Live Scoring & Self-Report Page for Players
+app.get('/live-score', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public/live-score.html'));
+});
+
+// Dedicated Esports Broadcast Overlays for OBS / vMix / WASP3D (TournaLink Suite)
+app.get('/overlay/leaderboard', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public/overlay-leaderboard.html'));
+});
+app.get('/overlay/ticker', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public/overlay-ticker.html'));
+});
+app.get('/overlay/winner', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public/overlay-winner.html'));
+});
+
+// Live Broadcast Data Feed for WASP3D, OBS Browser Sources & TournaLink
+let overlayBroadcastStates = {}; // tourneyId -> { state, activeMatchId }
+
+app.get('/api/overlay/data', (req, res) => {
+  try {
+    const tourneyId = parseInt(req.query.tourneyId, 10);
+    const tournament = tourneyId ? dbQueries.getTournament(tourneyId) : (dbQueries.getActiveTournaments() || [])[0];
+    if (!tournament) {
+      return res.json({ success: false, message: 'Tournament not found' });
+    }
+
+    const tId = tournament.id;
+    const participants = dbQueries.getConfirmedParticipants(tId);
+    const scoreboardEntries = dbQueries.getScoreboard(tId);
+    const matches = dbQueries.getTournamentMatches(tId);
+
+    // Calculate dynamic team standings
+    const standingsMap = {};
+    participants.forEach(p => {
+      const name = p.squad_name || p.team_name || p.username || 'Solo';
+      standingsMap[name] = { teamName: name, kills: 0, wins: 0, totalPoints: 0, matchesPlayed: 0 };
+    });
+
+    scoreboardEntries.forEach(entry => {
+      const team1 = entry.player1;
+      const team2 = entry.player2;
+      const winner = entry.winner;
+
+      if (!standingsMap[team1]) standingsMap[team1] = { teamName: team1, kills: 0, wins: 0, totalPoints: 0, matchesPlayed: 0 };
+      standingsMap[team1].matchesPlayed += 1;
+
+      // Parse score kills / points
+      const scoreNum = parseInt(entry.score, 10) || 0;
+      standingsMap[team1].kills += scoreNum;
+
+      if (winner && winner.toLowerCase() === team1.toLowerCase()) {
+        standingsMap[team1].wins += 1;
+        standingsMap[team1].totalPoints += 10; // 10 pts for 1st place in PUBG standard
+      }
+      standingsMap[team1].totalPoints += scoreNum; // 1 pt per kill
+    });
+
+    const standings = Object.values(standingsMap).sort((a, b) => b.totalPoints - a.totalPoints || b.kills - a.kills);
+
+    const bState = overlayBroadcastStates[tId] || {};
+    const activeMatch = bState.activeMatchId ? matches.find(m => m.id === Number(bState.activeMatchId)) : matches[0];
+
+    res.json({
+      success: true,
+      tournament,
+      standings,
+      matches,
+      activeMatch: activeMatch || null,
+      scoreboardEntries,
+      matchesLogged: scoreboardEntries.length,
+      broadcastState: bState.state || 'standings'
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.post('/api/overlay/set-active-match', checkAdminAuth, (req, res) => {
+  const { tourneyId, matchId } = req.body;
+  if (!overlayBroadcastStates[tourneyId]) overlayBroadcastStates[tourneyId] = {};
+  overlayBroadcastStates[tourneyId].activeMatchId = matchId;
+  res.json({ success: true, message: 'Active stream match updated' });
+});
+
+app.post('/api/overlay/set-state', checkAdminAuth, (req, res) => {
+  const { tourneyId, state } = req.body;
+  if (!overlayBroadcastStates[tourneyId]) overlayBroadcastStates[tourneyId] = {};
+  overlayBroadcastStates[tourneyId].state = state;
+  res.json({ success: true, message: `Overlay state set to ${state}` });
 });
 
 // Fallback to index.html for SPA

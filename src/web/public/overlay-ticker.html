@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <title>TournaLink / WASP3D Lower-Third Match Ticker Overlay</title>
+  <style>
+    * { box-sizing: border-box; }
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: transparent;
+      color: #fff;
+    }
+
+    /* Lower-Third Banner Positioned at Bottom Center */
+    .ticker-container {
+      position: absolute;
+      bottom: 60px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 1400px;
+      height: 110px;
+      background: linear-gradient(90deg, rgba(13, 17, 23, 0.96) 0%, rgba(22, 27, 34, 0.98) 50%, rgba(13, 17, 23, 0.96) 100%);
+      border: 3px solid #00E676;
+      border-radius: 16px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.8), 0 0 30px rgba(0, 230, 118, 0.3);
+      display: flex;
+      align-items: center;
+      padding: 0 30px;
+      gap: 25px;
+      animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes slideUp {
+      from { transform: translate(-50%, 150px); opacity: 0; }
+      to { transform: translate(-50%, 0); opacity: 1; }
+    }
+
+    .badge-stage {
+      background: #2563eb;
+      color: #fff;
+      font-weight: 800;
+      font-size: 1.1rem;
+      padding: 8px 18px;
+      border-radius: 8px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      box-shadow: 0 0 15px rgba(37, 99, 235, 0.5);
+    }
+
+    .matchup-center {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 30px;
+    }
+    .team-block {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .team-name-text {
+      font-size: 1.8rem;
+      font-weight: 900;
+      color: #fff;
+      letter-spacing: 1px;
+    }
+    .score-circle {
+      background: #00E676;
+      color: #0d1117;
+      font-size: 2rem;
+      font-weight: 900;
+      min-width: 54px;
+      height: 54px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 20px rgba(0, 230, 118, 0.6);
+    }
+    .vs-text {
+      font-size: 1.4rem;
+      font-weight: 800;
+      color: #8b949e;
+    }
+
+    .table-info-box {
+      background: rgba(255, 255, 255, 0.05);
+      border-left: 2px solid #00E676;
+      padding: 8px 18px;
+      text-align: right;
+    }
+    .table-title {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: #00E676;
+    }
+    .status-live-dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      background: #ef4444;
+      border-radius: 50%;
+      margin-right: 6px;
+      animation: blink 1s infinite;
+    }
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+  </style>
+</head>
+<body>
+
+  <div class="ticker-container" id="tickerRoot">
+    <div class="badge-stage" id="stageTag">MAP 1 / QF</div>
+
+    <div class="matchup-center">
+      <div class="team-block">
+        <span class="team-name-text" id="p1Name">Team Alpha</span>
+        <span class="score-circle" id="p1Score">0</span>
+      </div>
+      <span class="vs-text">VS</span>
+      <div class="team-block">
+        <span class="score-circle" id="p2Score">0</span>
+        <span class="team-name-text" id="p2Name">Team Bravo</span>
+      </div>
+    </div>
+
+    <div class="table-info-box">
+      <div class="table-title" id="tableStation">TABLE 1</div>
+      <div style="font-size: 0.9rem; color: #8b949e; margin-top: 2px;">
+        <span class="status-live-dot"></span>LIVE BROADCAST
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const tourneyId = urlParams.get('tourneyId') || '';
+
+    async function updateTickerData() {
+      try {
+        const res = await fetch(`/api/overlay/data?tourneyId=${encodeURIComponent(tourneyId)}`);
+        const data = await res.json();
+        if (!data.success) return;
+
+        const activeMatch = data.activeMatch || (data.matches && data.matches[0]);
+        if (!activeMatch) {
+          document.getElementById('stageTag').innerText = 'SCHEDULED';
+          document.getElementById('p1Name').innerText = 'AWAITING MATCH';
+          document.getElementById('p2Name').innerText = 'FIXTURE';
+          document.getElementById('p1Score').innerText = '-';
+          document.getElementById('p2Score').innerText = '-';
+          document.getElementById('tableStation').innerText = 'STATION READY';
+          return;
+        }
+
+        document.getElementById('stageTag').innerText = (activeMatch.round_name || 'ROUND 1').toUpperCase();
+        document.getElementById('p1Name').innerText = activeMatch.player1 || 'Team 1';
+        document.getElementById('p2Name').innerText = activeMatch.player2 || 'Team 2';
+        document.getElementById('p1Score').innerText = activeMatch.player1_score !== undefined ? activeMatch.player1_score : '0';
+        document.getElementById('p2Score').innerText = activeMatch.player2_score !== undefined ? activeMatch.player2_score : '0';
+        document.getElementById('tableStation').innerText = activeMatch.table_number ? `TABLE ${activeMatch.table_number}` : `CODE: ${activeMatch.match_code}`;
+      } catch (err) {
+        console.error('Error fetching ticker:', err);
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      updateTickerData();
+      setInterval(updateTickerData, 2000);
+    });
+  </script>
+</body>
+</html>

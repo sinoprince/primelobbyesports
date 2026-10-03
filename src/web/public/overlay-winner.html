@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <title>TournaLink / WASP3D Winner & MVP Celebration Overlay</title>
+  <style>
+    * { box-sizing: border-box; }
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: transparent;
+      color: #fff;
+    }
+
+    .winner-overlay-modal {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 1100px;
+      background: radial-gradient(circle at center, rgba(30, 27, 75, 0.96) 0%, rgba(15, 23, 42, 0.98) 100%);
+      border: 4px solid #facc15;
+      border-radius: 24px;
+      padding: 50px;
+      text-align: center;
+      box-shadow: 0 0 100px rgba(250, 204, 21, 0.5), 0 20px 60px rgba(0,0,0,0.9);
+      animation: popIn 0.7s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    @keyframes popIn {
+      0% { transform: translate(-50%, -50%) scale(0.6); opacity: 0; }
+      100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+    }
+
+    .trophy-glow {
+      font-size: 6rem;
+      margin-bottom: 10px;
+      filter: drop-shadow(0 0 30px rgba(250, 204, 21, 0.8));
+      animation: bounce 2s infinite ease-in-out;
+    }
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-12px); }
+    }
+
+    .headline-pill {
+      display: inline-block;
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      color: #000;
+      font-weight: 900;
+      font-size: 1.5rem;
+      padding: 8px 30px;
+      border-radius: 30px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 20px rgba(245, 158, 11, 0.5);
+    }
+
+    .winner-team-name {
+      font-size: 4rem;
+      font-weight: 900;
+      letter-spacing: 2px;
+      color: #fff;
+      text-shadow: 0 0 40px rgba(250, 204, 21, 0.7);
+      margin: 10px 0 20px;
+      text-transform: uppercase;
+    }
+
+    .stats-trio {
+      display: flex;
+      justify-content: center;
+      gap: 40px;
+      margin-top: 30px;
+      padding-top: 25px;
+      border-top: 2px solid rgba(255, 255, 255, 0.1);
+    }
+    .stat-pill-box {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(250, 204, 21, 0.3);
+      border-radius: 12px;
+      padding: 16px 30px;
+      min-width: 220px;
+    }
+    .stat-val {
+      font-size: 2.2rem;
+      font-weight: 900;
+      color: #facc15;
+    }
+    .stat-lbl {
+      font-size: 0.95rem;
+      color: #94a3b8;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="winner-overlay-modal" id="winnerRoot">
+    <div class="trophy-glow">🏆</div>
+    <div><span class="headline-pill" id="winnerHeadline">WINNER WINNER CHICKEN DINNER</span></div>
+    <div class="winner-team-name" id="winnerName">TEAM ALPHA</div>
+    <div id="tourneyDetails" style="font-size: 1.4rem; color: #cbd5e1; font-weight: 600;">PUBG Mobile Championship • Map 1 Erangel</div>
+
+    <div class="stats-trio">
+      <div class="stat-pill-box">
+        <div class="stat-val" id="scoreValue">15 KILLS</div>
+        <div class="stat-lbl">MATCH ELIMINATIONS</div>
+      </div>
+      <div class="stat-pill-box">
+        <div class="stat-val" id="totalPoints">25 PTS</div>
+        <div class="stat-lbl">TOTAL MAP POINTS</div>
+      </div>
+      <div class="stat-pill-box">
+        <div class="stat-val" id="rankPlace">#1 RANK</div>
+        <div class="stat-lbl">PLACEMENT</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const tourneyId = urlParams.get('tourneyId') || '';
+
+    async function updateWinnerData() {
+      try {
+        const res = await fetch(`/api/overlay/data?tourneyId=${encodeURIComponent(tourneyId)}`);
+        const data = await res.json();
+        if (!data.success) return;
+
+        const latestScore = data.scoreboardEntries && data.scoreboardEntries[data.scoreboardEntries.length - 1];
+        if (latestScore) {
+          document.getElementById('winnerName').innerText = latestScore.winner || latestScore.player1 || 'CHAMPION';
+          document.getElementById('tourneyDetails').innerText = `${data.tournament?.title || 'Tournament'} • ${latestScore.round_name}`;
+          document.getElementById('scoreValue').innerText = latestScore.score || 'VICTORY';
+        } else if (data.standings && data.standings.length > 0) {
+          const leader = data.standings[0];
+          document.getElementById('winnerName').innerText = leader.teamName;
+          document.getElementById('tourneyDetails').innerText = `${data.tournament?.title || 'Tournament'} • TOURNAMENT LEADER`;
+          document.getElementById('scoreValue').innerText = `${leader.kills || 0} KILLS`;
+          document.getElementById('totalPoints').innerText = `${leader.totalPoints || 0} PTS`;
+        }
+      } catch (err) {
+        console.error('Error fetching winner data:', err);
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      updateWinnerData();
+      setInterval(updateWinnerData, 4000);
+    });
+  </script>
+</body>
+</html>

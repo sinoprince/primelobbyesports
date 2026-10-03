@@ -746,6 +746,195 @@ const tournamentHandler = {
   },
 
   /**
+   * Assigns a match to a table/station by Tournament Director,
+   * sending an automated text/DM notification to both players with the match details and live score link!
+   */
+  assignMatchTable: async (client, matchId, tableNumber, directorMember) => {
+    const match = dbQueries.getMatch(matchId);
+    if (!match) return { success: false, message: 'Match not found.' };
+
+    const tournament = dbQueries.getTournament(match.tournament_id);
+    const updatedMatch = dbQueries.assignMatchToTable(matchId, tableNumber, directorMember?.id || 'admin');
+
+    const appUrl = process.env.BASE_URL || (process.env.RENDER_EXTERNAL_URL ? process.env.RENDER_EXTERNAL_URL : 'http://localhost:3000');
+    const liveScoreUrl = `${appUrl}/live-score?code=${updatedMatch.match_code}`;
+
+    // Notification message payload
+    const matchupText = `${updatedMatch.player1} 🆚 ${updatedMatch.player2}`;
+    const dmContent = `🚨 **MATCH CALL — ${tournament?.title || 'Tournament'}**\n\n` +
+      `• **Your Match:** \`${matchupText}\`\n` +
+      `• **Assigned Table / Station:** **Table ${tableNumber}**\n` +
+      `• **Stage / Round:** \`${updatedMatch.round_name}\`\n` +
+      `• **Match Code:** \`${updatedMatch.match_code}\`\n\n` +
+      `📱 **Mobile Live Scoring & Result Submission:**\n` +
+      `👉 Track game scores live & submit final result: <${liveScoreUrl}>\n\n` +
+      `*Please proceed to Table ${tableNumber} immediately to begin your match!*`;
+
+    // 1. Send Direct Message to Player 1 if Discord ID available
+    if (updatedMatch.player1_id && /^\d{17,20}$/.test(updatedMatch.player1_id)) {
+      await paymentBotService.sendDm(updatedMatch.player1_id, { content: dmContent }, client).catch(() => null);
+    }
+
+    // 2. Send Direct Message to Player 2 if Discord ID available
+    if (updatedMatch.player2_id && /^\d{17,20}$/.test(updatedMatch.player2_id)) {
+      await paymentBotService.sendDm(updatedMatch.player2_id, { content: dmContent }, client).catch(() => null);
+    }
+
+    // 3. Announce in Match Chat
+    if (tournament && tournament.chat_channel_id) {
+      const chatChan = await client.channels.fetch(tournament.chat_channel_id).catch(() => null);
+      if (chatChan) {
+        const p1Mention = /^\d{17,20}$/.test(updatedMatch.player1_id) ? `<@${updatedMatch.player1_id}>` : `**${updatedMatch.player1}**`;
+        const p2Mention = /^\d{17,20}$/.test(updatedMatch.player2_id) ? `<@${updatedMatch.player2_id}>` : `**${updatedMatch.player2}**`;
+        await chatChan.send({
+          content: `🎯 **MATCH CALLED TO TABLE ${tableNumber}!**\n` +
+            `• ${p1Mention} vs ${p2Mention}\n` +
+            `• Round: \`${updatedMatch.round_name}\` | Code: \`${updatedMatch.match_code}\`\n` +
+            `• Live Scoring: <${liveScoreUrl}>`
+        }).catch(() => null);
+      }
+    }
+
+    // 4. Refresh persistent Discord Scoreboard
+    await tournamentHandler.refreshTournamentScoreboard(client, match.tournament_id);
+
+    return {
+      success: true,
+      match: updatedMatch,
+      liveScoreUrl,
+      message: `✅ Match **${matchupText}** assigned to **Table ${tableNumber}**! Direct notifications sent to players.`
+    };
+  },
+
+  /**
+   * Updates live score on mobile device during match play.
+   */
+  updateMatchScoreLive: async (client, matchId, { player1_score, player2_score, live_score, updated_by }) => {
+    const updated = dbQueries.updateMatchLiveScore(matchId, {
+      player1_score,
+      player2_score,
+      live_score,
+      updated_by
+    });
+
+    if (!updated) return { success: false, message: 'Match not found.' };
+
+    // Refresh Discord scoreboard with live real-time score
+    await tournamentHandler.refreshTournamentScoreboard(client, updated.tournament_id);
+    return { success: true, match: updated };
+  },
+
+  /**
+   * Self-reporting of final score by a player from their mobile device.
+   */
+  submitMatchReport: async (client, matchId, { submitted_score, submitted_winner, submitted_by }) => {
+    const match = dbQueries.getMatch(matchId);
+    if (!match) return { success: false, message: 'Match not found.' };
+
+    const updated = dbQueries.submitMatchSelfReport(matchId, {
+      submitted_score,
+      submitted_winner,
+      submitted_by
+    });
+
+    const tournament = dbQueries.getTournament(match.tournament_id);
+
+    // Notify Tournament Director in Match Chat or Announcement channel that scores are awaiting approval
+    if (tournament && tournament.chat_channel_id) {
+      const chatChan = await client.channels.fetch(tournament.chat_channel_id).catch(() => null);
+      if (chatChan) {
+        await chatChan.send({
+          content: `📋 ⏳ **PENDING SCORE APPROVAL — Match Code: \`${updated.match_code}\`**\n` +
+            `• Match: **${updated.player1}** vs **${updated.player2}** (Table: \`${updated.table_number || 'N/A'}\`)\n` +
+            `• Submitted Score: \`${submitted_score}\`\n` +
+            `• Reported Winner: 🏆 **${submitted_winner}**\n` +
+            `*Tournament Director: Please review and approve in the Tournament Builder web portal.*`
+        }).catch(() => null);
+      }
+    }
+
+    return {
+      success: true,
+      match: updated,
+      message: '✅ Score submitted successfully! Waiting for Tournament Director review and approval.'
+    };
+  },
+
+  /**
+   * Approves a pending self-reported match score by Tournament Director:
+   * Marks match complete, releases table, advances players in bracket,
+   * updates live scoreboard, and announces result!
+   */
+  approveMatchReport: async (client, matchId, directorMember, overrideScore = null, overrideWinner = null) => {
+    const match = dbQueries.getMatch(matchId);
+    if (!match) return { success: false, message: 'Match not found.' };
+
+    const result = dbQueries.approveMatchScore(matchId, {
+      approved_by: directorMember?.id || 'admin',
+      final_score: overrideScore,
+      final_winner: overrideWinner
+    });
+
+    if (!result || !result.match) return { success: false, message: 'Could not approve match score.' };
+
+    const updatedMatch = result.match;
+    const tournament = dbQueries.getTournament(updatedMatch.tournament_id);
+
+    // 1. Add record into scoreboard entries
+    dbQueries.addScoreboardEntry({
+      tournament_id: updatedMatch.tournament_id,
+      round_name: updatedMatch.round_name,
+      player1: updatedMatch.player1,
+      player2: updatedMatch.player2,
+      score: result.score,
+      winner: result.winner,
+      updated_by: directorMember?.id || 'admin'
+    });
+
+    // 2. Refresh Discord Live Scoreboard & Bracket
+    await tournamentHandler.refreshTournamentScoreboard(client, updatedMatch.tournament_id);
+
+    // 3. Broadcast official result to Discord Announcements & Chat
+    if (tournament && tournament.announcements_channel_id) {
+      const annChan = await client.channels.fetch(tournament.announcements_channel_id).catch(() => null);
+      if (annChan) {
+        const embed = embedBuilder.createScoreboardEmbed(
+          tournament,
+          updatedMatch.round_name,
+          updatedMatch.player1,
+          updatedMatch.player2,
+          result.score,
+          result.winner,
+          directorMember?.user || { id: 'admin', tag: 'Tournament Director' }
+        );
+        await annChan.send(embed).catch(() => null);
+      }
+    }
+
+    if (tournament && tournament.chat_channel_id) {
+      const chatChan = await client.channels.fetch(tournament.chat_channel_id).catch(() => null);
+      if (chatChan) {
+        await chatChan.send({
+          content: `✅ 🏆 **OFFICIAL RESULT APPROVED & CONFIRMED!**\n` +
+            `• Match: **${updatedMatch.player1}** vs **${updatedMatch.player2}**\n` +
+            `• Final Score: \`${result.score}\`\n` +
+            `• Winner: 👑 **${result.winner}**\n` +
+            `• **Table ${result.releasedTable || 'Station'} is now RELEASED & OPEN** for next match!\n` +
+            (result.nextMatch ? `• 🚀 Winner advanced to \`${result.nextMatch.round_name}\` (Match Code: \`${result.nextMatch.match_code}\`)` : '')
+        }).catch(() => null);
+      }
+    }
+
+    return {
+      success: true,
+      match: updatedMatch,
+      releasedTable: result.releasedTable,
+      nextMatch: result.nextMatch,
+      message: `✅ Match **${updatedMatch.match_code}** approved! Table ${result.releasedTable || ''} released and bracket advanced.`
+    };
+  },
+
+  /**
    * Handles user leaving/canceling registration.
    */
   unregisterUser: async (client, tournamentId, member) => {

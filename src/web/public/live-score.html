@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>PLE Live Match Scoreboard & Self-Reporting</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    body {
+      background: #0d1117;
+      color: #f0f6fc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+    .mobile-header {
+      background: linear-gradient(135deg, #1f2937, #111827);
+      border-bottom: 2px solid #00E676;
+      padding: 16px 20px;
+      text-align: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .mobile-header h1 {
+      margin: 0;
+      font-size: 1.25rem;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .match-code-tag {
+      display: inline-block;
+      background: rgba(0, 230, 118, 0.15);
+      color: #00E676;
+      border: 1px solid #00E676;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-family: monospace;
+      font-weight: bold;
+      font-size: 0.85rem;
+      margin-top: 5px;
+    }
+    .mobile-container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 16px;
+    }
+    .match-card-hero {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 20px 16px;
+      margin-bottom: 16px;
+      text-align: center;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    }
+    .table-badge {
+      display: inline-block;
+      background: #2563eb;
+      color: #fff;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-weight: bold;
+      font-size: 0.9rem;
+      margin-bottom: 12px;
+      box-shadow: 0 0 12px rgba(37,99,235,0.4);
+    }
+    .vs-matchup {
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      margin: 16px 0;
+    }
+    .team-box {
+      flex: 1;
+      text-align: center;
+    }
+    .team-name {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #fff;
+      word-break: break-word;
+    }
+    .team-score-num {
+      font-size: 2.5rem;
+      font-weight: 800;
+      color: #00E676;
+      margin-top: 8px;
+      display: block;
+      line-height: 1;
+    }
+    .vs-circle {
+      font-weight: 800;
+      color: #8b949e;
+      padding: 0 10px;
+      font-size: 1.1rem;
+    }
+    .status-pill {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: bold;
+      text-transform: uppercase;
+    }
+    .status-assigned { background: #d97706; color: #fff; }
+    .status-in_progress { background: #2563eb; color: #fff; }
+    .status-pending_approval { background: #7c3aed; color: #fff; }
+    .status-completed { background: #059669; color: #fff; }
+
+    .score-controls-card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 18px;
+      margin-bottom: 16px;
+    }
+    .control-row {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .stepper-btn {
+      flex: 1;
+      background: #21262d;
+      border: 1px solid #30363d;
+      color: #fff;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 1.2rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .stepper-btn:active {
+      transform: scale(0.96);
+      background: #30363d;
+    }
+    .stepper-btn.add {
+      background: rgba(0, 230, 118, 0.15);
+      border-color: #00E676;
+      color: #00E676;
+    }
+    .btn-submit-report {
+      width: 100%;
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: #fff;
+      border: none;
+      padding: 16px;
+      font-size: 1.1rem;
+      font-weight: bold;
+      border-radius: 10px;
+      cursor: pointer;
+      box-shadow: 0 4px 15px rgba(16,185,129,0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .btn-submit-report:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .info-notice {
+      background: rgba(59, 130, 246, 0.1);
+      border-left: 4px solid #3b82f6;
+      padding: 12px;
+      border-radius: 0 8px 8px 0;
+      font-size: 0.85rem;
+      color: #93c5fd;
+      margin-bottom: 16px;
+      line-height: 1.4;
+    }
+    .pending-approval-box {
+      background: rgba(124, 58, 237, 0.15);
+      border: 1px solid #7c3aed;
+      border-radius: 10px;
+      padding: 16px;
+      text-align: center;
+      margin-top: 16px;
+    }
+  </style>
+</head>
+<body>
+
+  <header class="mobile-header">
+    <h1>⚔️ Live Match Scoreboard</h1>
+    <span id="matchCodeDisplay" class="match-code-tag">CODE: LOADING</span>
+  </header>
+
+  <main class="mobile-container">
+    <div id="loadingState" style="text-align: center; padding: 40px;">
+      ⏳ Loading match information...
+    </div>
+
+    <div id="matchContent" style="display: none;">
+      <!-- Hero Match Overview -->
+      <div class="match-card-hero">
+        <div id="tableBadge" class="table-badge">📍 Table / Station</div>
+        <div id="tournamentTitle" style="font-size: 0.9rem; color: #8b949e; margin-bottom: 8px;">Tournament</div>
+        <div id="roundName" style="font-weight: bold; color: #e6edf3; font-size: 1rem;">Round 1</div>
+
+        <div class="vs-matchup">
+          <div class="team-box">
+            <div id="p1Name" class="team-name">Player 1</div>
+            <span id="p1Score" class="team-score-num">0</span>
+          </div>
+          <div class="vs-circle">VS</div>
+          <div class="team-box">
+            <div id="p2Name" class="team-name">Player 2</div>
+            <span id="p2Score" class="team-score-num">0</span>
+          </div>
+        </div>
+
+        <div style="margin-top: 10px;">
+          <span id="statusBadge" class="status-pill status-assigned">ASSIGNED</span>
+        </div>
+      </div>
+
+      <!-- Real-time Live Score Tracker -->
+      <div class="score-controls-card">
+        <h3 style="margin: 0 0 12px; font-size: 1rem; color: #fff;">📱 Live Game Score Ticker</h3>
+        <p style="margin: 0 0 14px; font-size: 0.8rem; color: #8b949e;">
+          Tap buttons to update real-time score. Spectators & Discord will follow along live!
+        </p>
+
+        <div style="margin-bottom: 12px;">
+          <strong id="lblP1" style="font-size: 0.85rem; color: #58a6ff;">Player 1 Score:</strong>
+          <div class="control-row" style="margin-top: 6px;">
+            <button class="stepper-btn" onclick="adjustScore('p1', -1)">- 1</button>
+            <button class="stepper-btn add" onclick="adjustScore('p1', 1)">+ 1</button>
+          </div>
+        </div>
+
+        <div>
+          <strong id="lblP2" style="font-size: 0.85rem; color: #f0883e;">Player 2 Score:</strong>
+          <div class="control-row" style="margin-top: 6px;">
+            <button class="stepper-btn" onclick="adjustScore('p2', -1)">- 1</button>
+            <button class="stepper-btn add" onclick="adjustScore('p2', 1)">+ 1</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Final Score Self-Reporting Form -->
+      <div class="score-controls-card">
+        <h3 style="margin: 0 0 10px; font-size: 1rem; color: #fff;">🏆 Submit Match for Approval</h3>
+        <div class="info-notice">
+          Once your match has concluded, submit the final score to the <strong>Tournament Director</strong>. The table will be automatically released and the winner advanced upon TD confirmation.
+        </div>
+
+        <form id="submitReportForm" onsubmit="handleFinalReportSubmit(event)">
+          <div style="margin-bottom: 12px;">
+            <label style="font-size: 0.85rem; font-weight: bold; color: #c9d1d9; display: block; margin-bottom: 6px;">
+              Final Score Summary
+            </label>
+            <input type="text" id="finalScoreInput" style="width: 100%; box-sizing: border-box; padding: 12px; background: #0d1117; border: 1px solid #30363d; border-radius: 8px; color: #fff; font-size: 1rem;" placeholder="e.g. 2 - 1 or 13 - 11" required>
+          </div>
+
+          <div style="margin-bottom: 16px;">
+            <label style="font-size: 0.85rem; font-weight: bold; color: #c9d1d9; display: block; margin-bottom: 6px;">
+              Match Winner
+            </label>
+            <select id="winnerSelect" style="width: 100%; box-sizing: border-box; padding: 12px; background: #0d1117; border: 1px solid #30363d; border-radius: 8px; color: #fff; font-size: 1rem;" required>
+              <option value="">Select match winner...</option>
+            </select>
+          </div>
+
+          <button type="submit" id="btnSubmitFinal" class="btn-submit-report">
+            🚀 Submit Final Score to Director
+          </button>
+        </form>
+
+        <div id="pendingBox" class="pending-approval-box" style="display: none;">
+          <h4 style="margin: 0 0 6px; color: #c084fc;">⏳ Score Submitted to Tournament Director!</h4>
+          <p style="margin: 0; font-size: 0.85rem; color: #e9d5ff;">
+            Waiting for Tournament Director review and approval in the Tournament Builder view. The table and bracket will update automatically upon confirmation.
+          </p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const matchCode = urlParams.get('code') || '';
+    let currentMatch = null;
+
+    async function loadMatch() {
+      if (!matchCode) {
+        document.getElementById('loadingState').innerHTML = '❌ No Match Code specified in link. Please check your SMS/DM.';
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/live-score/${encodeURIComponent(matchCode)}`);
+        const data = await res.json();
+        if (!data.success || !data.match) {
+          document.getElementById('loadingState').innerHTML = '❌ Match not found. Please verify match code.';
+          return;
+        }
+
+        currentMatch = data.match;
+        const tourney = data.tournament || {};
+
+        document.getElementById('matchCodeDisplay').innerText = `CODE: ${currentMatch.match_code}`;
+        document.getElementById('tableBadge').innerText = currentMatch.table_number ? `📍 Table ${currentMatch.table_number}` : '📍 Station Assigned';
+        document.getElementById('tournamentTitle').innerText = tourney.title || 'Official Tournament';
+        document.getElementById('roundName').innerText = currentMatch.round_name || 'Match Fixture';
+        document.getElementById('p1Name').innerText = currentMatch.player1;
+        document.getElementById('p2Name').innerText = currentMatch.player2;
+        document.getElementById('p1Score').innerText = currentMatch.player1_score || 0;
+        document.getElementById('p2Score').innerText = currentMatch.player2_score || 0;
+        document.getElementById('lblP1').innerText = `${currentMatch.player1} Score:`;
+        document.getElementById('lblP2').innerText = `${currentMatch.player2} Score:`;
+
+        const statusPill = document.getElementById('statusBadge');
+        statusPill.className = `status-pill status-${(currentMatch.status || 'assigned').toLowerCase()}`;
+        statusPill.innerText = (currentMatch.status || 'ASSIGNED').replace('_', ' ');
+
+        // Populate Winner select
+        const winSelect = document.getElementById('winnerSelect');
+        winSelect.innerHTML = `
+          <option value="">Select match winner...</option>
+          <option value="${currentMatch.player1}">${currentMatch.player1}</option>
+          <option value="${currentMatch.player2}">${currentMatch.player2}</option>
+        `;
+
+        if (!document.getElementById('finalScoreInput').value) {
+          document.getElementById('finalScoreInput').value = `${currentMatch.player1_score || 0} - ${currentMatch.player2_score || 0}`;
+        }
+
+        if (currentMatch.status === 'PENDING_APPROVAL') {
+          document.getElementById('pendingBox').style.display = 'block';
+          document.getElementById('btnSubmitFinal').disabled = true;
+          document.getElementById('btnSubmitFinal').innerText = '⏳ Awaiting Director Approval';
+        } else if (currentMatch.status === 'COMPLETED') {
+          document.getElementById('pendingBox').style.display = 'block';
+          document.getElementById('pendingBox').innerHTML = `<h4>🏆 Match Completed!</h4><p>Winner: <strong>${currentMatch.winner}</strong> | Score: <strong>${currentMatch.submitted_score || currentMatch.live_score}</strong></p>`;
+          document.getElementById('btnSubmitFinal').disabled = true;
+          document.getElementById('btnSubmitFinal').innerText = '✅ Match Concluded';
+        }
+
+        document.getElementById('loadingState').style.display = 'none';
+        document.getElementById('matchContent').style.display = 'block';
+      } catch (err) {
+        document.getElementById('loadingState').innerHTML = '❌ Connection error loading match details.';
+      }
+    }
+
+    async function adjustScore(target, delta) {
+      if (!currentMatch) return;
+      let p1 = Number(currentMatch.player1_score || 0);
+      let p2 = Number(currentMatch.player2_score || 0);
+
+      if (target === 'p1') p1 = Math.max(0, p1 + delta);
+      if (target === 'p2') p2 = Math.max(0, p2 + delta);
+
+      currentMatch.player1_score = p1;
+      currentMatch.player2_score = p2;
+
+      document.getElementById('p1Score').innerText = p1;
+      document.getElementById('p2Score').innerText = p2;
+      document.getElementById('finalScoreInput').value = `${p1} - ${p2}`;
+
+      // Auto pick winner if obvious
+      if (p1 > p2) document.getElementById('winnerSelect').value = currentMatch.player1;
+      else if (p2 > p1) document.getElementById('winnerSelect').value = currentMatch.player2;
+
+      // Sync live score ticker
+      await fetch(`/api/live-score/${encodeURIComponent(matchCode)}/update`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          player1_score: p1,
+          player2_score: p2,
+          live_score: `${p1} - ${p2}`
+        })
+      });
+    }
+
+    async function handleFinalReportSubmit(e) {
+      e.preventDefault();
+      const score = document.getElementById('finalScoreInput').value.trim();
+      const winner = document.getElementById('winnerSelect').value.trim();
+
+      if (!score || !winner) {
+        alert('Please provide final score and select winner.');
+        return;
+      }
+
+      const btn = document.getElementById('btnSubmitFinal');
+      btn.disabled = true;
+      btn.innerText = '⏳ Submitting score to Director...';
+
+      try {
+        const res = await fetch(`/api/live-score/${encodeURIComponent(matchCode)}/submit`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            submitted_score: score,
+            submitted_winner: winner,
+            submitted_by: 'Mobile Player'
+          })
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          document.getElementById('pendingBox').style.display = 'block';
+          btn.innerText = '⏳ Awaiting Director Approval';
+        } else {
+          alert(data.message || 'Error submitting score');
+          btn.disabled = false;
+          btn.innerText = '🚀 Submit Final Score to Director';
+        }
+      } catch (err) {
+        alert('Network error submitting score.');
+        btn.disabled = false;
+      }
+    }
+
+    // Auto-poll match every 10 seconds for real-time bracket updates
+    document.addEventListener('DOMContentLoaded', () => {
+      loadMatch();
+      setInterval(loadMatch, 10000);
+    });
+  </script>
+</body>
+</html>
