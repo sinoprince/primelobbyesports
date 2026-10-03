@@ -7,6 +7,12 @@ let cachedPayments = [];
 let tournamentFilter = 'all';
 let paymentFilter = 'all';
 
+let currentRole = localStorage.getItem('ple_user_role') || 'admin';
+let currentUserName = localStorage.getItem('ple_user_name') || 'League Administrator';
+let activeLeagueId = null;
+let cachedLeagues = [];
+let leagueMatchesFilter = 'all';
+
 // Preset configurations matching user specifications
 const PRESETS = {
   pubg_squad: {
@@ -113,34 +119,100 @@ function showDashboard() {
   document.getElementById('appContainer').classList.remove('hidden');
 }
 
+let selectedLoginRole = 'admin';
+
+function selectLoginRole(role) {
+  selectedLoginRole = role;
+  document.querySelectorAll('.role-btn').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById(`roleBtn${role.charAt(0).toUpperCase() + role.slice(1)}`);
+  if (btn) btn.classList.add('active');
+
+  const adminGroup = document.getElementById('loginAdminGroup');
+  const nameGroup = document.getElementById('loginNameGroup');
+  const teamGroup = document.getElementById('loginTeamGroup');
+  const submitBtn = document.getElementById('loginSubmitBtn');
+
+  if (role === 'admin') {
+    adminGroup.classList.remove('hidden');
+    nameGroup.classList.add('hidden');
+    teamGroup.classList.add('hidden');
+    submitBtn.innerText = '🔓 Access Management Software';
+  } else if (role === 'referee') {
+    adminGroup.classList.add('hidden');
+    nameGroup.classList.remove('hidden');
+    teamGroup.classList.add('hidden');
+    document.getElementById('loginNameLabel').innerText = 'Official Referee Name';
+    document.getElementById('loginName').placeholder = 'e.g. Official Sharma';
+    submitBtn.innerText = '⚖️ Enter as Match Referee';
+  } else if (role === 'manager') {
+    adminGroup.classList.add('hidden');
+    nameGroup.classList.remove('hidden');
+    teamGroup.classList.remove('hidden');
+    document.getElementById('loginNameLabel').innerText = 'Team Manager Name';
+    document.getElementById('loginName').placeholder = 'e.g. Coach David';
+    submitBtn.innerText = '👥 Enter as Team Manager';
+  }
+}
+
 async function handleLogin(e) {
   e.preventDefault();
-  const pinInput = document.getElementById('adminPin');
   const errorEl = document.getElementById('loginError');
   errorEl.classList.add('hidden');
 
-  const secret = pinInput.value.trim();
-  if (!secret) return;
+  let body = { role: selectedLoginRole };
+
+  if (selectedLoginRole === 'admin') {
+    const pin = document.getElementById('adminPin').value.trim();
+    if (!pin) {
+      errorEl.innerText = 'Admin PIN is required.';
+      errorEl.classList.remove('hidden');
+      return;
+    }
+    body.pin = pin;
+  } else if (selectedLoginRole === 'referee') {
+    const name = document.getElementById('loginName').value.trim();
+    if (!name) {
+      errorEl.innerText = 'Official name is required.';
+      errorEl.classList.remove('hidden');
+      return;
+    }
+    body.name = name;
+  } else if (selectedLoginRole === 'manager') {
+    const name = document.getElementById('loginName').value.trim();
+    const team = document.getElementById('loginTeam').value.trim();
+    if (!name || !team) {
+      errorEl.innerText = 'Manager name and assigned team name are required.';
+      errorEl.classList.remove('hidden');
+      return;
+    }
+    body.name = name;
+    body.team = team;
+  }
 
   try {
     const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ secret })
+      body: JSON.stringify(body)
     });
     const data = await res.json();
     if (data.success && data.token) {
       currentToken = data.token;
+      currentRole = data.role || selectedLoginRole;
+      currentUserName = data.name || (currentRole === 'admin' ? 'League Administrator' : 'User');
       localStorage.setItem('ple_admin_token', currentToken);
+      localStorage.setItem('ple_user_role', currentRole);
+      localStorage.setItem('ple_user_name', currentUserName);
+
       showDashboard();
       initDashboard();
-      showToast('Welcome to Prime Lobby Esports Management Software', 'success');
+      showToast(data.message || 'Login successful', 'success');
     } else {
-      errorEl.innerText = data.error || 'Invalid Admin Secret Key';
+      errorEl.innerText = data.message || 'Invalid login details';
       errorEl.classList.remove('hidden');
     }
   } catch (err) {
-    errorEl.innerText = 'Server connection failed. Ensure web software is running.';
+    errorEl.innerText = 'Server connection failed. Ensure server is running.';
     errorEl.classList.remove('hidden');
   }
 }
@@ -148,6 +220,8 @@ async function handleLogin(e) {
 function logout() {
   currentToken = '';
   localStorage.removeItem('ple_admin_token');
+  localStorage.removeItem('ple_user_role');
+  localStorage.removeItem('ple_user_name');
   showLogin();
 }
 
@@ -173,8 +247,21 @@ async function apiFetch(endpoint, options = {}) {
 
 // Initial Dashboard Setup
 async function initDashboard() {
+  // Update Role UI Indicator
+  const roleDisplay = document.getElementById('currentRoleBadge');
+  const userDisplay = document.getElementById('currentUserDisplay');
+  if (roleDisplay) {
+    if (currentRole === 'admin') roleDisplay.innerText = 'Director / Admin Mode';
+    else if (currentRole === 'referee') roleDisplay.innerText = `Official Referee (${currentUserName})`;
+    else if (currentRole === 'manager') roleDisplay.innerText = `Team Manager (${currentUserName})`;
+  }
+  if (userDisplay) {
+    userDisplay.innerText = `● ${currentUserName} (${currentRole.toUpperCase()})`;
+  }
+
   loadStats();
   loadChannels();
+  loadLeagues();
   loadTournaments();
   // Poll stats every 30 seconds for live updates
   setInterval(loadStats, 30000);
@@ -197,7 +284,9 @@ function switchTab(tabName) {
 
 function refreshCurrentTab() {
   loadStats();
-  if (currentTab === 'tournaments') {
+  if (currentTab === 'leagues') {
+    loadLeagues();
+  } else if (currentTab === 'tournaments') {
     loadTournaments();
   } else if (currentTab === 'participants') {
     loadParticipantsTab();
@@ -1477,5 +1566,360 @@ async function handleBroadcastRoomSubmit(e) {
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// 12. SPORTS LEAGUE & STATE MEETS CLIENT HANDLERS
+// ═══════════════════════════════════════════════════════════════════════════
 
+async function loadLeagues() {
+  try {
+    const res = await apiFetch('/api/leagues');
+    cachedLeagues = (res && res.leagues) || [];
 
+    const select = document.getElementById('activeLeagueSelect');
+    if (!select) return;
+
+    if (cachedLeagues.length === 0) {
+      select.innerHTML = '<option value="">No Sports Leagues found (Click Create)</option>';
+      document.getElementById('leagueDashboardSection').classList.add('hidden');
+      document.getElementById('noLeaguePlaceholder').classList.remove('hidden');
+      return;
+    }
+
+    select.innerHTML = cachedLeagues.map(l => `
+      <option value="${l.id}" ${l.id === activeLeagueId ? 'selected' : ''}>
+        ${l.name} (${l.sport} - ${l.age_category || 'Open'})
+      </option>
+    `).join('');
+
+    if (!activeLeagueId || !cachedLeagues.some(l => l.id === activeLeagueId)) {
+      activeLeagueId = cachedLeagues[0].id;
+      select.value = activeLeagueId;
+    }
+
+    loadActiveLeagueDetails(activeLeagueId);
+  } catch (err) {
+    showToast('Failed to load sports leagues', 'danger');
+  }
+}
+
+function handleLeagueSelectChange(val) {
+  if (!val) return;
+  activeLeagueId = parseInt(val, 10);
+  loadActiveLeagueDetails(activeLeagueId);
+}
+
+async function loadActiveLeagueDetails(leagueId) {
+  if (!leagueId) return;
+  try {
+    const res = await apiFetch(`/api/leagues/${leagueId}`);
+    if (!res || !res.success) {
+      showToast(res ? res.message : 'League details unavailable', 'danger');
+      return;
+    }
+
+    const { league, teams, standings, matches } = res;
+    document.getElementById('leagueDashboardSection').classList.remove('hidden');
+    document.getElementById('noLeaguePlaceholder').classList.add('hidden');
+
+    // Status Badge
+    const badgeContainer = document.getElementById('leagueStatusBadgeContainer');
+    if (badgeContainer) {
+      const isPlayoffs = league.status === 'PLAYOFFS';
+      badgeContainer.innerHTML = isPlayoffs 
+        ? '<span class="badge" style="background: rgba(255,171,0,0.2); color: #FFAB00; border: 1px solid #FFAB00; font-size: 0.9rem; padding: 6px 14px;">⚡ PLAYOFFS / SEMIFINALS ACTIVE</span>'
+        : '<span class="badge" style="background: rgba(0,230,118,0.2); color: #00E676; border: 1px solid #00E676; font-size: 0.9rem; padding: 6px 14px;">🟢 GROUP / POOL STAGE</span>';
+    }
+
+    // Stats Grid
+    document.getElementById('leagueTeamCount').innerText = `${teams.length} / ${league.max_teams || 10}`;
+    document.getElementById('leagueCategoryDisplay').innerText = `${league.sport} (${league.age_category || 'U-17'})`;
+    document.getElementById('leagueGenderDisplay').innerText = `${league.gender_category || 'Boys'} Category`;
+    document.getElementById('leagueMatchesCount').innerText = matches.length;
+    document.getElementById('leagueStageDisplay').innerText = league.status || 'GROUP STAGE';
+
+    // Render Standings Tables
+    renderPoolTable('poolATableBody', standings.poolA || []);
+    renderPoolTable('poolBTableBody', standings.poolB || []);
+
+    // Render Fixtures
+    renderLeagueMatches(matches);
+
+    // Disable or Enable Admin-only elements based on role
+    const autoPlayoffsBtn = document.getElementById('btnAutoPlayoffs');
+    if (autoPlayoffsBtn) {
+      autoPlayoffsBtn.style.display = currentRole === 'admin' ? 'inline-block' : 'none';
+    }
+  } catch (err) {
+    showToast('Failed to load active league dashboard', 'danger');
+  }
+}
+
+function renderPoolTable(tbodyId, teams) {
+  const tbody = document.getElementById(tbodyId);
+  if (!tbody) return;
+
+  if (teams.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="10" class="text-center" style="padding: 16px; color: var(--text-muted);">No teams registered in this pool yet</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = teams.map((t, idx) => {
+    const isTop2 = idx < 2;
+    return `
+      <tr style="${isTop2 ? 'background: rgba(0,230,118,0.04);' : ''}">
+        <td><strong>${idx + 1}</strong></td>
+        <td>
+          <div style="font-weight: 600; color: #fff;">${t.name}</div>
+          <div style="font-size: 0.75rem; color: var(--text-muted);">${t.district || 'State District'}</div>
+        </td>
+        <td>${t.played || 0}</td>
+        <td style="color: #00E676; font-weight: 600;">${t.won || 0}</td>
+        <td style="color: #FFAB00;">${t.drawn || 0}</td>
+        <td style="color: #FF5252;">${t.lost || 0}</td>
+        <td>${t.goals_for || 0}</td>
+        <td>${t.goals_against || 0}</td>
+        <td style="font-weight: 600; color: ${(t.goal_difference || 0) >= 0 ? '#00E676' : '#FF5252'};">${(t.goal_difference || 0) > 0 ? '+' : ''}${t.goal_difference || 0}</td>
+        <td><strong style="color: #00E676; font-size: 1.05rem;">${t.points || 0}</strong></td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function renderLeagueMatches(matches) {
+  const tbody = document.getElementById('leagueMatchesTableBody');
+  if (!tbody) return;
+
+  const filtered = matches.filter(m => {
+    if (leagueMatchesFilter === 'SCHEDULED') return m.status === 'SCHEDULED' || m.status === 'LIVE';
+    if (leagueMatchesFilter === 'COMPLETED') return m.status === 'COMPLETED';
+    return true;
+  });
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" class="text-center" style="padding: 20px; color: var(--text-muted);">No matches match filter</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(m => {
+    const isDone = m.status === 'COMPLETED';
+    const isLive = m.status === 'LIVE';
+    const statusBadge = isDone 
+      ? '<span class="badge badge-success">Completed</span>'
+      : (isLive ? '<span class="badge" style="background:#FF5252; color:#fff;">🔴 LIVE</span>' : '<span class="badge badge-warning">Scheduled</span>');
+
+    return `
+      <tr>
+        <td><strong>#${m.id}</strong></td>
+        <td><span style="font-weight: 600; color: var(--accent);">${m.round_name}</span></td>
+        <td>${m.table_number || 'Court 1'}</td>
+        <td>
+          <div style="font-size: 0.95rem; font-weight: 600; color: #fff;">
+            <span>${m.player1}</span> <span style="color: var(--text-muted); font-size: 0.8rem; margin: 0 4px;">vs</span> <span>${m.player2}</span>
+          </div>
+        </td>
+        <td>${m.scheduled_date ? `${m.scheduled_date} ${m.scheduled_time || ''}` : 'Today / In Session'}</td>
+        <td>
+          <span style="font-size: 1.1rem; font-weight: 700; color: ${isDone ? '#00E676' : '#fff'};">
+            ${m.player1_score !== undefined && m.player1_score !== null ? `${m.player1_score} - ${m.player2_score}` : '0 - 0'}
+          </span>
+        </td>
+        <td>${statusBadge}</td>
+        <td>
+          <button class="btn btn-sm btn-outline" onclick="openUpdateLeagueScoreModal(${m.id}, '${m.player1.replace(/'/g, "\\'")}', '${m.player2.replace(/'/g, "\\'")}', '${m.table_number || 'Court 1'}', ${m.player1_score || 0}, ${m.player2_score || 0}, '${m.status}')">
+            ⚖️ Update Score
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function filterLeagueMatches(status) {
+  leagueMatchesFilter = status;
+  if (activeLeagueId) loadActiveLeagueDetails(activeLeagueId);
+}
+
+// Create Sports League Modal
+function openCreateLeagueModal() {
+  document.getElementById('createLeagueModal').classList.remove('hidden');
+}
+
+function closeCreateLeagueModal() {
+  document.getElementById('createLeagueModal').classList.add('hidden');
+  document.getElementById('createLeagueForm').reset();
+}
+
+async function handleCreateLeagueSubmit(e) {
+  e.preventDefault();
+  const name = document.getElementById('leagueNameInput').value.trim();
+  const sport = document.getElementById('leagueSportInput').value;
+  const age_category = document.getElementById('leagueAgeInput').value;
+  const gender_category = document.getElementById('leagueGenderInput').value;
+  const location = document.getElementById('leagueLocationInput').value.trim();
+  const max_teams = document.getElementById('leagueMaxTeamsInput').value;
+
+  const res = await apiFetch('/api/leagues/create', {
+    method: 'POST',
+    body: JSON.stringify({ name, sport, age_category, gender_category, location, max_teams })
+  });
+
+  if (res && res.success) {
+    showToast(res.message || 'Sports League created!', 'success');
+    closeCreateLeagueModal();
+    activeLeagueId = res.league.id;
+    loadLeagues();
+  } else {
+    showToast(res ? res.message : 'Failed to create sports league', 'danger');
+  }
+}
+
+// Register Team Modal
+function openRegisterTeamModal() {
+  if (!activeLeagueId) {
+    showToast('Please select or create a league first', 'warning');
+    return;
+  }
+  document.getElementById('registerTeamModal').classList.remove('hidden');
+}
+
+function closeRegisterTeamModal() {
+  document.getElementById('registerTeamModal').classList.add('hidden');
+  document.getElementById('registerTeamForm').reset();
+}
+
+async function handleRegisterTeamSubmit(e) {
+  e.preventDefault();
+  const name = document.getElementById('teamNameInput').value.trim();
+  const district = document.getElementById('teamDistrictInput').value.trim();
+  const pool = document.getElementById('teamPoolInput').value;
+  const coach = document.getElementById('teamCoachInput').value.trim();
+  const contact = document.getElementById('teamContactInput').value.trim();
+
+  const res = await apiFetch(`/api/leagues/${activeLeagueId}/teams`, {
+    method: 'POST',
+    body: JSON.stringify({ name, district, pool, coach, contact })
+  });
+
+  if (res && res.success) {
+    showToast(res.message || 'Team registered successfully!', 'success');
+    closeRegisterTeamModal();
+    loadActiveLeagueDetails(activeLeagueId);
+  } else {
+    showToast(res ? res.message : 'Registration failed', 'danger');
+  }
+}
+
+// Schedule Match Modal
+async function openScheduleMatchModal() {
+  if (!activeLeagueId) {
+    showToast('Please select or create a league first', 'warning');
+    return;
+  }
+  const res = await apiFetch(`/api/leagues/${activeLeagueId}`);
+  const teams = (res && res.teams) || [];
+  if (teams.length < 2) {
+    showToast('Need at least 2 teams registered in the league to schedule matches!', 'warning');
+    return;
+  }
+
+  const t1Select = document.getElementById('leagueMatchT1Select');
+  const t2Select = document.getElementById('leagueMatchT2Select');
+  t1Select.innerHTML = teams.map(t => `<option value="${t.name}">${t.name} (${t.pool})</option>`).join('');
+  t2Select.innerHTML = teams.map(t => `<option value="${t.name}">${t.name} (${t.pool})</option>`).join('');
+  if (teams.length > 1) t2Select.selectedIndex = 1;
+
+  document.getElementById('scheduleMatchModal').classList.remove('hidden');
+}
+
+function closeScheduleMatchModal() {
+  document.getElementById('scheduleMatchModal').classList.add('hidden');
+  document.getElementById('scheduleMatchForm').reset();
+}
+
+async function handleScheduleLeagueMatchSubmit(e) {
+  e.preventDefault();
+  const round_name = document.getElementById('leagueMatchRoundInput').value.trim();
+  const player1 = document.getElementById('leagueMatchT1Select').value;
+  const player2 = document.getElementById('leagueMatchT2Select').value;
+  const table_number = document.getElementById('leagueMatchCourtInput').value.trim();
+  const dateTimeVal = document.getElementById('leagueMatchDateTimeInput').value;
+
+  let match_date = null;
+  let match_time = null;
+  if (dateTimeVal) {
+    const parts = dateTimeVal.split('T');
+    match_date = parts[0];
+    match_time = parts[1];
+  }
+
+  const res = await apiFetch(`/api/leagues/${activeLeagueId}/matches/schedule`, {
+    method: 'POST',
+    body: JSON.stringify({ round_name, player1, player2, table_number, match_date, match_time })
+  });
+
+  if (res && res.success) {
+    showToast(res.message || 'Match scheduled!', 'success');
+    closeScheduleMatchModal();
+    loadActiveLeagueDetails(activeLeagueId);
+  } else {
+    showToast(res ? res.message : 'Failed to schedule match', 'danger');
+  }
+}
+
+// Update Score Modal
+function openUpdateLeagueScoreModal(matchId, p1, p2, court, s1, s2, status) {
+  document.getElementById('scoringMatchId').value = matchId;
+  document.getElementById('scoringMatchupTitle').innerText = `${p1} vs ${p2}`;
+  document.getElementById('scoringMatchCourt').innerText = court;
+  document.getElementById('scoringT1Label').innerText = `${p1} Score`;
+  document.getElementById('scoringT2Label').innerText = `${p2} Score`;
+  document.getElementById('scoringT1Input').value = s1 || 0;
+  document.getElementById('scoringT2Input').value = s2 || 0;
+  document.getElementById('scoringStatusSelect').value = status || 'COMPLETED';
+
+  document.getElementById('updateLeagueScoreModal').classList.remove('hidden');
+}
+
+function closeUpdateLeagueScoreModal() {
+  document.getElementById('updateLeagueScoreModal').classList.add('hidden');
+}
+
+async function handleUpdateLeagueScoreSubmit(e) {
+  e.preventDefault();
+  const matchId = document.getElementById('scoringMatchId').value;
+  const player1_score = document.getElementById('scoringT1Input').value;
+  const player2_score = document.getElementById('scoringT2Input').value;
+  const status = document.getElementById('scoringStatusSelect').value;
+
+  const res = await apiFetch(`/api/leagues/${activeLeagueId}/matches/${matchId}/score`, {
+    method: 'POST',
+    body: JSON.stringify({ player1_score, player2_score, status })
+  });
+
+  if (res && res.success) {
+    showToast(res.message || 'Score updated and standings recalculated!', 'success');
+    closeUpdateLeagueScoreModal();
+    loadActiveLeagueDetails(activeLeagueId);
+  } else {
+    showToast(res ? res.message : 'Failed to update score', 'danger');
+  }
+}
+
+// Auto-generate Semifinal & Final Playoffs
+async function handleGeneratePlayoffs() {
+  if (!activeLeagueId) return;
+  if (!confirm('Auto-generate Semifinals & Finals? This will pair Pool A #1 vs Pool B #2, and Pool B #1 vs Pool A #2 into the championship bracket!')) {
+    return;
+  }
+
+  const res = await apiFetch(`/api/leagues/${activeLeagueId}/generate-playoffs`, {
+    method: 'POST'
+  });
+
+  if (res && res.success) {
+    showToast(res.message || 'Semifinals and Grand Final created with bracket linkage!', 'success');
+    loadActiveLeagueDetails(activeLeagueId);
+  } else {
+    showToast(res ? res.message : 'Cannot generate playoffs yet', 'danger');
+  }
+}

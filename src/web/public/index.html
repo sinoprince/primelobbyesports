@@ -11,22 +11,43 @@
 </head>
 <body>
 
-  <!-- Login Modal / Screen -->
+  <!-- Login Modal / Screen with Role Selection -->
   <div id="loginOverlay" class="login-overlay">
     <div class="login-card">
-      <div class="brand-badge">🛡️ ADMIN PORTAL</div>
-      <h2>Prime Lobby Esports</h2>
-      <p class="subtitle">Tournament Management & Billing Software</p>
+      <div class="brand-badge">🛡️ PORTAL ACCESS</div>
+      <h2>Sports League & Esports Hub</h2>
+      <p class="subtitle">State Meets, League Management & Esports Platform</p>
       
+      <!-- Role Switcher Tabs in Login -->
+      <div class="role-selector" style="display: flex; gap: 8px; margin-bottom: 16px;">
+        <button type="button" class="btn btn-sm role-btn active" id="roleBtnAdmin" onclick="selectLoginRole('admin')">👑 League Admin</button>
+        <button type="button" class="btn btn-sm role-btn" id="roleBtnReferee" onclick="selectLoginRole('referee')">⚖️ Match Referee</button>
+        <button type="button" class="btn btn-sm role-btn" id="roleBtnManager" onclick="selectLoginRole('manager')">👥 Team Manager</button>
+      </div>
+
       <form id="loginForm" onsubmit="handleLogin(event)">
-        <div class="form-group">
+        <!-- Admin PIN field (shown for admin) -->
+        <div class="form-group" id="loginAdminGroup">
           <label for="adminPin">Admin Access PIN / Secret Key</label>
-          <input type="password" id="adminPin" placeholder="Enter Admin Secret PIN" required autocomplete="current-password">
+          <input type="password" id="adminPin" placeholder="Enter Admin Secret PIN (Default: PLE-ADMIN-2026)" autocomplete="current-password">
         </div>
-        <button type="submit" class="btn btn-primary btn-block">🔓 Access Management Software</button>
+
+        <!-- Official / Referee / Manager Name field -->
+        <div class="form-group hidden" id="loginNameGroup">
+          <label for="loginName" id="loginNameLabel">Your Full Name</label>
+          <input type="text" id="loginName" placeholder="e.g. Official Ref Sharma">
+        </div>
+
+        <!-- Manager Team Name field -->
+        <div class="form-group hidden" id="loginTeamGroup">
+          <label for="loginTeam">Assigned Team Name</label>
+          <input type="text" id="loginTeam" placeholder="e.g. St. Xavier Titans / Red Dragons">
+        </div>
+
+        <button type="submit" id="loginSubmitBtn" class="btn btn-primary btn-block">🔓 Access Management Software</button>
       </form>
       <div id="loginError" class="alert alert-danger hidden"></div>
-      <p class="login-footer">🔒 Restricted to authorized Discord Server Administrators & Staff.</p>
+      <p class="login-footer">🔒 Role-based access for League Directors, Referees, and Team Managers.</p>
     </div>
   </div>
 
@@ -36,25 +57,26 @@
     <!-- Top Navigation Bar -->
     <header class="top-nav">
       <div class="nav-brand">
-        <span class="logo-icon">🏆</span>
+        <span class="logo-icon">🏅</span>
         <div>
-          <span class="brand-title">PRIME LOBBY ESPORTS</span>
-          <span class="brand-sub">Tournament Management Software</span>
+          <span class="brand-title">LEAGUE & ESPORTS PRO</span>
+          <span class="brand-sub" id="currentRoleBadge">State Tournaments & Meets</span>
         </div>
       </div>
 
       <nav class="nav-tabs">
-        <button class="nav-tab active" onclick="switchTab('tournaments')">🏆 Tournaments</button>
+        <button class="nav-tab active" onclick="switchTab('leagues')">🏅 Sports Leagues & State Meets</button>
+        <button class="nav-tab" onclick="switchTab('tournaments')">🏆 Esports Tournaments</button>
         <button class="nav-tab" onclick="switchTab('participants')">👥 Teams & Slots</button>
         <button class="nav-tab" onclick="switchTab('payments')">💳 Payment Ledger</button>
         <button class="nav-tab" onclick="switchTab('scoreboard')">📊 Match Scoreboard</button>
-        <button class="nav-tab" onclick="switchTab('production')">🎬 Esports Broadcast (OBS/TournaLink)</button>
+        <button class="nav-tab" onclick="switchTab('production')">🎬 Broadcast (OBS/TournaLink)</button>
         <button class="nav-tab" onclick="switchTab('tickets')">🎫 Support Tickets</button>
         <button class="nav-tab" onclick="switchTab('announcements')">📢 Announcements</button>
       </nav>
 
       <div class="nav-actions">
-        <span class="status-indicator online" title="Discord Bots Connected">● Live Bot Sync</span>
+        <span class="status-indicator online" id="currentUserDisplay">● Live Synced</span>
         <button class="btn btn-sm btn-outline" onclick="refreshCurrentTab()">🔄 Refresh</button>
         <button class="btn btn-sm btn-danger-outline" onclick="logout()">Logout</button>
       </div>
@@ -102,8 +124,168 @@
         </div>
       </section>
 
+      <!-- TAB 0: Sports League & State Meets Management -->
+      <section id="tab-leagues" class="tab-pane active">
+        <div class="pane-header">
+          <div>
+            <h2>🏅 Sports League & State Tournament Command</h2>
+            <p>Complete management for School Game Federation, State-Level Meets, Pool Division, and Automated Playoffs.</p>
+          </div>
+          <div class="action-buttons">
+            <button class="btn btn-primary" id="btnOpenCreateLeagueModal" onclick="openCreateLeagueModal()">➕ Create League / Meet</button>
+          </div>
+        </div>
+
+        <!-- League Selection Header -->
+        <div class="filter-bar" style="display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap;">
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <label style="font-weight: 600; color: var(--text-muted); font-size: 0.9rem;">SELECT LEAGUE:</label>
+            <select id="activeLeagueSelect" onchange="handleLeagueSelectChange(this.value)" style="padding: 8px 14px; border-radius: 6px; background: var(--bg-card); color: #fff; border: 1px solid var(--border-color); font-weight: 600; min-width: 260px;">
+              <option value="">Loading leagues...</option>
+            </select>
+          </div>
+          <div id="leagueStatusBadgeContainer">
+            <!-- Dynamic League Status Badge -->
+          </div>
+        </div>
+
+        <!-- League Summary Dashboard -->
+        <div id="leagueDashboardSection" class="hidden">
+          <div class="stats-grid" style="margin-bottom: 24px;">
+            <div class="stat-card">
+              <div class="stat-header"><span class="stat-title">TEAMS REGISTERED</span><span>👥</span></div>
+              <div class="stat-value" id="leagueTeamCount">0 / 10</div>
+              <div class="stat-sub" id="leagueCapSub">Max 10 Teams (State Meet Standard)</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-header"><span class="stat-title">CATEGORY</span><span>🎯</span></div>
+              <div class="stat-value" style="font-size: 1.4rem;" id="leagueCategoryDisplay">Football U-17</div>
+              <div class="stat-sub" id="leagueGenderDisplay">Boys Category</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-header"><span class="stat-title">MATCHES PLAYED</span><span>⚡</span></div>
+              <div class="stat-value" id="leagueMatchesCount">0</div>
+              <div class="stat-sub">Group & Knockouts</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-header"><span class="stat-title">TOURNAMENT STAGE</span><span>🏆</span></div>
+              <div class="stat-value text-accent" style="font-size: 1.3rem;" id="leagueStageDisplay">GROUP STAGE</div>
+              <div class="stat-sub">Round-Robin Pools</div>
+            </div>
+          </div>
+
+          <!-- Quick Action Bar -->
+          <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; justify-content: space-between; background: var(--bg-card); padding: 12px 18px; border-radius: 8px; border: 1px solid var(--border-color);">
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+              <button class="btn btn-sm btn-primary" onclick="openRegisterTeamModal()">➕ Register Team (Pool A/B)</button>
+              <button class="btn btn-sm btn-outline" onclick="openScheduleMatchModal()">📅 Schedule Match</button>
+            </div>
+            <div>
+              <button class="btn btn-sm btn-success" id="btnAutoPlayoffs" onclick="handleGeneratePlayoffs()">⚡ Auto-Generate Semifinals & Finals</button>
+            </div>
+          </div>
+
+          <!-- Standings & Pool Tables Section -->
+          <div class="grid-2col" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 20px; margin-bottom: 28px;">
+            <!-- Pool A Standings Table -->
+            <div class="table-container" style="background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border-color); padding: 16px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <h3 style="margin: 0; color: #00E676; display: flex; align-items: center; gap: 8px;">
+                  <span>🟢</span> POOL A STANDINGS
+                </h3>
+                <span class="badge" style="background: rgba(0,230,118,0.1); color: #00E676; border: 1px solid #00E676;">Top 2 Advance to Semis</span>
+              </div>
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Team</th>
+                    <th>P</th>
+                    <th>W</th>
+                    <th>D</th>
+                    <th>L</th>
+                    <th>GF</th>
+                    <th>GA</th>
+                    <th>GD</th>
+                    <th>PTS</th>
+                  </tr>
+                </thead>
+                <tbody id="poolATableBody">
+                  <tr><td colspan="10" class="text-center">No teams registered in Pool A</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Pool B Standings Table -->
+            <div class="table-container" style="background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border-color); padding: 16px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <h3 style="margin: 0; color: #00B0FF; display: flex; align-items: center; gap: 8px;">
+                  <span>🔵</span> POOL B STANDINGS
+                </h3>
+                <span class="badge" style="background: rgba(0,176,255,0.1); color: #00B0FF; border: 1px solid #00B0FF;">Top 2 Advance to Semis</span>
+              </div>
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Team</th>
+                    <th>P</th>
+                    <th>W</th>
+                    <th>D</th>
+                    <th>L</th>
+                    <th>GF</th>
+                    <th>GA</th>
+                    <th>GD</th>
+                    <th>PTS</th>
+                  </tr>
+                </thead>
+                <tbody id="poolBTableBody">
+                  <tr><td colspan="10" class="text-center">No teams registered in Pool B</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Matches & Fixtures Schedule -->
+          <div class="table-container" style="background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border-color); padding: 16px; margin-bottom: 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+              <h3 style="margin: 0;">📅 Fixtures, Results & Live Scoring</h3>
+              <div style="display: flex; gap: 8px;">
+                <button class="filter-pill active" onclick="filterLeagueMatches('all')">All</button>
+                <button class="filter-pill" onclick="filterLeagueMatches('SCHEDULED')">Upcoming</button>
+                <button class="filter-pill" onclick="filterLeagueMatches('COMPLETED')">Completed</button>
+              </div>
+            </div>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Match #</th>
+                  <th>Stage / Round</th>
+                  <th>Court / Ground</th>
+                  <th>Matchup</th>
+                  <th>Date & Time</th>
+                  <th>Score</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="leagueMatchesTableBody">
+                <tr><td colspan="8" class="text-center">No scheduled matches found for this league</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+        </div>
+
+        <div id="noLeaguePlaceholder" class="empty-state" style="padding: 40px; text-align: center;">
+          <span style="font-size: 3rem;">🏅</span>
+          <h3>No Sports League Selected</h3>
+          <p>Please select an existing state league above or create a new league to manage teams, fixtures, and pool standings.</p>
+        </div>
+      </section>
+
       <!-- TAB 1: Tournaments Management -->
-      <section id="tab-tournaments" class="tab-pane active">
+      <section id="tab-tournaments" class="tab-pane">
         <div class="pane-header">
           <div>
             <h2>🏆 Tournament Command Center</h2>
@@ -880,6 +1062,191 @@
         <div class="modal-footer">
           <button type="button" class="btn btn-outline" onclick="closeRoomModal()">Cancel</button>
           <button type="submit" class="btn btn-primary" id="btnBroadcastRoom">🚀 Send Room ID & Pass to Players</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Create Sports League Modal -->
+  <div id="createLeagueModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>🏅 Create New Sports League / State Meet</h3>
+        <button class="modal-close" onclick="closeCreateLeagueModal()">&times;</button>
+      </div>
+      <form id="createLeagueForm" onsubmit="handleCreateLeagueSubmit(event)">
+        <div class="form-group">
+          <label>League / Championship Title</label>
+          <input type="text" id="leagueNameInput" placeholder="e.g. State School Games Football Championship 2026" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label>Sport Discipline</label>
+            <select id="leagueSportInput" required>
+              <option value="Football">⚽ Football</option>
+              <option value="Basketball">🏀 Basketball</option>
+              <option value="Volleyball">🏐 Volleyball</option>
+              <option value="Badminton">🏸 Badminton</option>
+              <option value="Cricket">🏏 Cricket</option>
+              <option value="Kabaddi">🤼 Kabaddi</option>
+              <option value="Table Tennis">🏓 Table Tennis</option>
+              <option value="Other">🏅 Other Sport</option>
+            </select>
+          </div>
+          <div class="form-group flex-1">
+            <label>Age Category</label>
+            <select id="leagueAgeInput">
+              <option value="Under-14 (Sub-Junior)">Under-14 (Sub-Junior)</option>
+              <option value="Under-17 (Junior)" selected>Under-17 (Junior)</option>
+              <option value="Under-19 (Senior)">Under-19 (Senior)</option>
+              <option value="Open / Senior">Open / Senior</option>
+            </select>
+          </div>
+          <div class="form-group flex-1">
+            <label>Gender Category</label>
+            <select id="leagueGenderInput">
+              <option value="Boys">Boys / Men</option>
+              <option value="Girls">Girls / Women</option>
+              <option value="Mixed">Mixed</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label>Location / Venue</label>
+            <input type="text" id="leagueLocationInput" placeholder="e.g. Indira Gandhi Stadium / Sports Complex" value="State Sports Complex">
+          </div>
+          <div class="form-group flex-1">
+            <label>Max Teams Limit (Rule)</label>
+            <input type="number" id="leagueMaxTeamsInput" value="10" min="2" max="10" required>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="closeCreateLeagueModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create Sports League</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Register Team Modal -->
+  <div id="registerTeamModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>👥 Register Team into League</h3>
+        <button class="modal-close" onclick="closeRegisterTeamModal()">&times;</button>
+      </div>
+      <form id="registerTeamForm" onsubmit="handleRegisterTeamSubmit(event)">
+        <div class="form-group">
+          <label>Team / School Name</label>
+          <input type="text" id="teamNameInput" placeholder="e.g. St. Xavier Titans" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label>District / Region</label>
+            <input type="text" id="teamDistrictInput" placeholder="e.g. Central District" required>
+          </div>
+          <div class="form-group flex-1">
+            <label>Pool / Group Assignment</label>
+            <select id="teamPoolInput" required>
+              <option value="Pool A">🟢 Pool A</option>
+              <option value="Pool B">🔵 Pool B</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label>Head Coach / Manager</label>
+            <input type="text" id="teamCoachInput" placeholder="e.g. Coach Ramesh">
+          </div>
+          <div class="form-group flex-1">
+            <label>Contact Phone / Info</label>
+            <input type="text" id="teamContactInput" placeholder="e.g. +91 98765 43210">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="closeRegisterTeamModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Confirm Registration</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Schedule League Match Modal -->
+  <div id="scheduleMatchModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>📅 Schedule League Fixture</h3>
+        <button class="modal-close" onclick="closeScheduleMatchModal()">&times;</button>
+      </div>
+      <form id="scheduleMatchForm" onsubmit="handleScheduleLeagueMatchSubmit(event)">
+        <div class="form-group">
+          <label>Stage / Round</label>
+          <input type="text" id="leagueMatchRoundInput" value="Group Match (Pool Stage)" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label>Team 1</label>
+            <select id="leagueMatchT1Select" required></select>
+          </div>
+          <div class="form-group flex-1">
+            <label>Team 2</label>
+            <select id="leagueMatchT2Select" required></select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label>Court / Ground / Field</label>
+            <input type="text" id="leagueMatchCourtInput" placeholder="e.g. Ground 1 or Court B" value="Ground 1">
+          </div>
+          <div class="form-group flex-1">
+            <label>Match Date & Time</label>
+            <input type="datetime-local" id="leagueMatchDateTimeInput">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="closeScheduleMatchModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Schedule Fixture</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Referee / Admin Match Score Update Modal -->
+  <div id="updateLeagueScoreModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>⚖️ Update Match Score & Results</h3>
+        <button class="modal-close" onclick="closeUpdateLeagueScoreModal()">&times;</button>
+      </div>
+      <form id="updateLeagueScoreForm" onsubmit="handleUpdateLeagueScoreSubmit(event)">
+        <input type="hidden" id="scoringMatchId">
+        <div style="background: rgba(0,230,118,0.1); border: 1px solid #00E676; border-radius: 8px; padding: 12px; margin-bottom: 14px; text-align: center;">
+          <h4 id="scoringMatchupTitle" style="margin: 0; color: #fff;">Team A vs Team B</h4>
+          <span id="scoringMatchCourt" style="font-size: 0.85rem; color: #c9d1d9;">Court / Ground 1</span>
+        </div>
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label id="scoringT1Label">Team 1 Score</label>
+            <input type="number" id="scoringT1Input" min="0" value="0" required>
+          </div>
+          <div class="form-group flex-1">
+            <label id="scoringT2Label">Team 2 Score</label>
+            <input type="number" id="scoringT2Input" min="0" value="0" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Match Status</label>
+          <select id="scoringStatusSelect">
+            <option value="COMPLETED">🏁 Match Finished (Final Result)</option>
+            <option value="LIVE">🔴 Match In Progress (Live Score)</option>
+          </select>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="closeUpdateLeagueScoreModal()">Cancel</button>
+          <button type="submit" class="btn btn-success">Save & Update Standings</button>
         </div>
       </form>
     </div>

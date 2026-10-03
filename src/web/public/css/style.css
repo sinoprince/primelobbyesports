@@ -957,9 +957,58 @@ input:focus, select:focus, textarea:focus {
 .toast-error { border-left: 4px solid var(--danger); }
 .toast-info { border-left: 4px solid var(--primary); }
 
-@keyframes slideIn {
-  from { transform: translateX(100%); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
+/* Role Selector in Login Screen */
+.role-selector {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 4px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.role-btn {
+  flex: 1;
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid transparent;
+  padding: 8px 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.role-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.role-btn.active {
+  background: var(--primary);
+  color: #fff;
+  box-shadow: 0 0 12px var(--primary-glow);
+}
+
+/* Pool Standings & League Badges */
+.badge-pool-a {
+  background: rgba(0, 230, 118, 0.15);
+  color: #00E676;
+  border: 1px solid #00E676;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 12px;
+}
+
+.badge-pool-b {
+  background: rgba(0, 176, 255, 0.15);
+  color: #00B0FF;
+  border: 1px solid #00B0FF;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 12px;
 }
 
 /* Responsive */

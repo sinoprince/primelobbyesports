@@ -37,6 +37,8 @@ function loadDatabase() {
       // Ensure all keys exist
       inMemoryData.guild_settings = inMemoryData.guild_settings || {};
       inMemoryData.tournaments = inMemoryData.tournaments || [];
+      inMemoryData.leagues = inMemoryData.leagues || [];
+      inMemoryData.sports_teams = inMemoryData.sports_teams || [];
       inMemoryData.tournament_participants = inMemoryData.tournament_participants || [];
       inMemoryData.scoreboard_entries = inMemoryData.scoreboard_entries || [];
       inMemoryData.matches = inMemoryData.matches || [];
@@ -45,6 +47,7 @@ function loadDatabase() {
       inMemoryData.tickets = inMemoryData.tickets || [];
       inMemoryData.counters = inMemoryData.counters || {
         tournament_id: 0,
+        league_id: 10,
         payment_id: 1000,
         invoice_id: 5000,
         match_id: 100,
@@ -53,6 +56,7 @@ function loadDatabase() {
       if (inMemoryData.counters.payment_id === undefined) inMemoryData.counters.payment_id = 1000;
       if (inMemoryData.counters.invoice_id === undefined) inMemoryData.counters.invoice_id = 5000;
       if (inMemoryData.counters.match_id === undefined) inMemoryData.counters.match_id = 100;
+      if (inMemoryData.counters.league_id === undefined) inMemoryData.counters.league_id = 10;
     } catch (err) {
       console.error('[Database] Failed to parse existing storage.json, initializing fresh state:', err);
       inMemoryData = JSON.parse(JSON.stringify(defaultState));
@@ -463,6 +467,234 @@ const dbQueries = {
     data.matches = data.matches.filter(m => m.id !== mId);
     saveDatabase();
     return data.matches.length < initial;
+  },
+
+  // --- Sports League & Pool Management Suite ---
+  createLeague: (leagueData) => {
+    const data = loadDatabase();
+    data.counters.league_id = (data.counters.league_id || 10) + 1;
+    const newId = data.counters.league_id;
+
+    const newLeague = {
+      id: newId,
+      name: leagueData.name,
+      sport: leagueData.sport || 'Football', // Football, Basketball, Volleyball, Cricket, Kabaddi, Badminton, etc.
+      category: leagueData.category || 'Open State', // School Under-14/17/19, Men, Women, Mixed, State Meet
+      age_group: leagueData.age_group || 'All Ages',
+      gender: leagueData.gender || 'Boys / Men',
+      format: leagueData.format || 'ROUND_ROBIN_AND_KNOCKOUT', // ROUND_ROBIN, POOLS_TO_KNOCKOUT, SINGLE_ELIMINATION
+      max_teams: Number(leagueData.max_teams) || 10,
+      pools: leagueData.pools || ['Pool A', 'Pool B'],
+      status: 'REGISTRATION', // REGISTRATION, GROUP_STAGE, PLAYOFFS, COMPLETED
+      created_by: leagueData.created_by || 'League Admin',
+      created_at: new Date().toISOString()
+    };
+
+    data.leagues.push(newLeague);
+    saveDatabase();
+    return newLeague;
+  },
+
+  getLeagues: () => {
+    const data = loadDatabase();
+    return data.leagues || [];
+  },
+
+  getLeague: (id) => {
+    const data = loadDatabase();
+    return (data.leagues || []).find(l => l.id === Number(id)) || null;
+  },
+
+  updateLeague: (id, updateFields) => {
+    const data = loadDatabase();
+    const idx = (data.leagues || []).findIndex(l => l.id === Number(id));
+    if (idx === -1) return null;
+    data.leagues[idx] = { ...data.leagues[idx], ...updateFields };
+    saveDatabase();
+    return data.leagues[idx];
+  },
+
+  // Teams in Sports League (School / State level teams up to 10 teams)
+  registerLeagueTeam: (leagueId, teamData) => {
+    const data = loadDatabase();
+    const lId = Number(leagueId);
+
+    const count = (data.sports_teams || []).filter(t => t.league_id === lId).length;
+    if (count >= 10 && !teamData.bypassLimit) {
+      return { success: false, message: 'Maximum 10 teams limit reached for this State / School event.' };
+    }
+
+    const newTeam = {
+      id: Date.now() + Math.floor(Math.random() * 1000),
+      league_id: lId,
+      name: teamData.name,
+      school_district: teamData.school_district || 'District / Club',
+      manager_name: teamData.manager_name || 'Coach',
+      manager_phone: teamData.manager_phone || '',
+      pool: teamData.pool || 'Pool A', // Pool A or Pool B
+      played: 0,
+      won: 0,
+      drawn: 0,
+      lost: 0,
+      goals_for: 0,
+      goals_against: 0,
+      goal_difference: 0,
+      points: 0,
+      registered_at: new Date().toISOString()
+    };
+
+    data.sports_teams.push(newTeam);
+    saveDatabase();
+    return { success: true, team: newTeam };
+  },
+
+  getLeagueTeams: (leagueId) => {
+    const data = loadDatabase();
+    return (data.sports_teams || []).filter(t => t.league_id === Number(leagueId));
+  },
+
+  // League Standings with Goal Difference & Automatic Points Calculation
+  calculateLeagueStandings: (leagueId) => {
+    const data = loadDatabase();
+    const lId = Number(leagueId);
+    const teams = (data.sports_teams || []).filter(t => t.league_id === lId);
+    const leagueMatches = (data.matches || []).filter(m => m.league_id === lId && m.status === 'COMPLETED');
+
+    // Reset stats
+    teams.forEach(t => {
+      t.played = 0;
+      t.won = 0;
+      t.drawn = 0;
+      t.lost = 0;
+      t.goals_for = 0;
+      t.goals_against = 0;
+      t.goal_difference = 0;
+      t.points = 0;
+    });
+
+    leagueMatches.forEach(m => {
+      const t1 = teams.find(t => t.name.toLowerCase() === m.player1.toLowerCase());
+      const t2 = teams.find(t => t.name.toLowerCase() === m.player2.toLowerCase());
+
+      const s1 = Number(m.player1_score) || 0;
+      const s2 = Number(m.player2_score) || 0;
+
+      if (t1 && t2) {
+        t1.played += 1;
+        t2.played += 1;
+        t1.goals_for += s1;
+        t1.goals_against += s2;
+        t2.goals_for += s2;
+        t2.goals_against += s1;
+
+        if (s1 > s2) {
+          t1.won += 1;
+          t1.points += 3;
+          t2.lost += 1;
+        } else if (s2 > s1) {
+          t2.won += 1;
+          t2.points += 3;
+          t1.lost += 1;
+        } else {
+          t1.drawn += 1;
+          t2.drawn += 1;
+          t1.points += 1;
+          t2.points += 1;
+        }
+
+        t1.goal_difference = t1.goals_for - t1.goals_against;
+        t2.goal_difference = t2.goals_for - t2.goals_against;
+      }
+    });
+
+    // Sort by Points (descending) -> Goal Difference (descending) -> Goals For (descending)
+    const sorted = [...teams].sort((a, b) => {
+      if (b.points !== a.points) return b.points - a.points;
+      if (b.goal_difference !== a.goal_difference) return b.goal_difference - a.goal_difference;
+      return b.goals_for - a.goals_for;
+    });
+
+    // Group by Pool
+    const poolA = sorted.filter(t => t.pool === 'Pool A');
+    const poolB = sorted.filter(t => t.pool === 'Pool B');
+
+    saveDatabase();
+    return { overall: sorted, poolA, poolB };
+  },
+
+  // Automatic Semifinal and Final Match Generation Based on Pool Standings
+  generatePlayoffsMatches: (leagueId, scheduleDate = null) => {
+    const data = loadDatabase();
+    const lId = Number(leagueId);
+    const standings = dbQueries.calculateLeagueStandings(lId);
+
+    // Require top 2 from Pool A and top 2 from Pool B
+    const topPoolA = standings.poolA.slice(0, 2);
+    const topPoolB = standings.poolB.slice(0, 2);
+
+    if (topPoolA.length < 2 || topPoolB.length < 2) {
+      return {
+        success: false,
+        message: 'Need at least 2 ranked teams in each pool to auto-generate semifinals!'
+      };
+    }
+
+    // Semi 1: 1st of Pool A vs 2nd of Pool B
+    // Semi 2: 1st of Pool B vs 2nd of Pool A
+    const sfDate = scheduleDate || new Date().toISOString().split('T')[0];
+
+    // Check if semifinals already exist to prevent duplicate scheduling
+    const existing = (data.matches || []).filter(m => m.league_id === lId && m.round_name.includes('Semifinal'));
+    if (existing.length > 0) {
+      return { success: false, message: 'Playoffs/Semifinals have already been generated for this league.' };
+    }
+
+    // 1. Create Final placeholder match first so next_match_id links properly
+    const finalMatch = dbQueries.createMatch({
+      league_id: lId,
+      tournament_id: 0,
+      round_name: 'Grand Final (State Championship)',
+      bracket_pos: 'FINAL',
+      player1: 'Winner Semifinal 1',
+      player2: 'Winner Semifinal 2',
+      status: 'SCHEDULED'
+    });
+
+    // 2. Semifinal 1
+    const semi1 = dbQueries.createMatch({
+      league_id: lId,
+      tournament_id: 0,
+      round_name: 'Semifinal 1 (Pool A #1 vs Pool B #2)',
+      bracket_pos: 'SF-1',
+      next_match_id: finalMatch.id,
+      player1: topPoolA[0].name,
+      player2: topPoolB[1].name,
+      table_number: 'Ground / Court 1',
+      status: 'SCHEDULED'
+    });
+
+    // 3. Semifinal 2
+    const semi2 = dbQueries.createMatch({
+      league_id: lId,
+      tournament_id: 0,
+      round_name: 'Semifinal 2 (Pool B #1 vs Pool A #2)',
+      bracket_pos: 'SF-2',
+      next_match_id: finalMatch.id,
+      player1: topPoolB[0].name,
+      player2: topPoolA[1].name,
+      table_number: 'Ground / Court 2',
+      status: 'SCHEDULED'
+    });
+
+    dbQueries.updateLeague(lId, { status: 'PLAYOFFS' });
+
+    return {
+      success: true,
+      message: '✅ Semifinals and Grand Final created automatically with bracket linkage!',
+      semi1,
+      semi2,
+      finalMatch
+    };
   },
 
 

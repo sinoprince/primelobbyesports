@@ -13,18 +13,48 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Simple Auth Middleware
-function checkAdminAuth(req, res, next) {
+// Role-Based Auth Helpers
+function getAuthInfo(req) {
   const authHeader = req.headers['authorization'] || req.headers['x-admin-key'] || req.query.key;
-  if (!authHeader) {
-    return res.status(401).json({ success: false, message: 'Authentication required. Please enter Admin PIN.' });
-  }
-
+  if (!authHeader) return null;
   const token = authHeader.replace(/^Bearer\s+/i, '').trim();
-  if (token !== ADMIN_SECRET) {
-    return res.status(403).json({ success: false, message: 'Invalid Admin PIN/Secret.' });
+
+  // 1. Master Admin Token
+  if (token === ADMIN_SECRET) {
+    return { role: 'admin', name: 'Master Administrator' };
   }
 
+  // 2. Parsed Session Token (e.g. ROLE:NAME or referee/manager)
+  try {
+    if (token.startsWith('ROLE_')) {
+      const parts = Buffer.from(token.replace('ROLE_', ''), 'base64').toString('utf-8').split(':');
+      return { role: parts[0], name: parts[1] || parts[0], team: parts[2] || null };
+    }
+  } catch (e) {}
+
+  return null;
+}
+
+// Simple Auth Middleware for Admin
+function checkAdminAuth(req, res, next) {
+  const auth = getAuthInfo(req);
+  if (!auth) {
+    return res.status(401).json({ success: false, message: 'Authentication required. Please log in.' });
+  }
+  if (auth.role !== 'admin') {
+    return res.status(403).json({ success: false, message: 'Access denied. Administrator privileges required.' });
+  }
+  req.user = auth;
+  next();
+}
+
+// Middleware allowing Admin OR Referee OR Team Manager
+function checkAnyAuth(req, res, next) {
+  const auth = getAuthInfo(req);
+  if (!auth) {
+    return res.status(401).json({ success: false, message: 'Authentication required. Please log in.' });
+  }
+  req.user = auth;
   next();
 }
 
@@ -36,13 +66,55 @@ app.get('/ping', (req, res) => {
   res.status(200).send('pong');
 });
 
-// 1. Auth Endpoint
+// 1. Auth Endpoint (supports Master Admin PIN and Role Logins)
 app.post('/api/auth/login', (req, res) => {
   const pin = req.body.pin || req.body.secret || req.body.password;
-  if (pin && pin.trim() === ADMIN_SECRET) {
-    return res.json({ success: true, token: ADMIN_SECRET, message: 'Login successful' });
+  const role = req.body.role || 'admin';
+  const name = req.body.name || req.body.username || '';
+  const team = req.body.team || '';
+
+  // Master Admin login
+  if (role === 'admin') {
+    if (pin && pin.trim() === ADMIN_SECRET) {
+      return res.json({ 
+        success: true, 
+        token: ADMIN_SECRET, 
+        role: 'admin', 
+        name: 'League Administrator',
+        message: 'Administrator login successful' 
+      });
+    }
+    return res.status(401).json({ success: false, message: 'Incorrect Admin PIN. Access denied.' });
   }
-  return res.status(401).json({ success: false, message: 'Incorrect Admin PIN. Access denied.' });
+
+  // Referee / Official login
+  if (role === 'referee') {
+    const refName = (name || 'Match Referee').trim();
+    const tokenPayload = `ROLE_` + Buffer.from(`referee:${refName}`).toString('base64');
+    return res.json({
+      success: true,
+      token: tokenPayload,
+      role: 'referee',
+      name: refName,
+      message: `Logged in as Match Referee: ${refName}`
+    });
+  }
+
+  // Team Manager login
+  if (role === 'manager') {
+    const mgrName = (name || 'Team Manager').trim();
+    const tokenPayload = `ROLE_` + Buffer.from(`manager:${mgrName}:${team}`).toString('base64');
+    return res.json({
+      success: true,
+      token: tokenPayload,
+      role: 'manager',
+      name: mgrName,
+      team: team || 'Independent Team',
+      message: `Logged in as Team Manager: ${mgrName}`
+    });
+  }
+
+  return res.status(400).json({ success: false, message: 'Invalid role specified.' });
 });
 
 // 2. Overview Stats Endpoint
@@ -555,6 +627,212 @@ app.post('/api/setup', checkAdminAuth, async (req, res) => {
   try {
     const { type, cleanRebuild, channelId } = req.body;
     const result = await botBridge.runSetup(type || 'all', { cleanRebuild: Boolean(cleanRebuild), channelId });
+    if (!result.success) return res.status(400).json(result);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 11. SPORTS LEAGUE & TOURNAMENT MANAGEMENT ENDPOINTS (School / State Meets)
+// ═══════════════════════════════════════════════════════════════════════════
+
+// List all sports leagues
+app.get('/api/leagues', (req, res) => {
+  try {
+    const leagues = dbQueries.getLeagues();
+    res.json({ success: true, leagues });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// Create a new Sports League / Meet
+app.post('/api/leagues/create', checkAdminAuth, (req, res) => {
+  try {
+    const { name, sport, age_category, gender_category, location, start_date, end_date, max_teams, format } = req.body;
+    if (!name || !sport) {
+      return res.status(400).json({ success: false, message: 'League Name and Sport are required.' });
+    }
+
+    const league = dbQueries.createLeague({
+      name,
+      sport,
+      age_category: age_category || 'Open',
+      gender_category: gender_category || 'Boys',
+      location: location || 'State Sports Complex',
+      start_date,
+      end_date,
+      max_teams: parseInt(max_teams, 10) || 10,
+      format: format || 'POOLS_ROUND_ROBIN'
+    });
+
+    res.json({ success: true, league, message: '✅ Sports League created successfully!' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// Get league details, teams and matches
+app.get('/api/leagues/:id', (req, res) => {
+  try {
+    const leagueId = parseInt(req.params.id, 10);
+    const league = dbQueries.getLeague(leagueId);
+    if (!league) return res.status(404).json({ success: false, message: 'League not found.' });
+
+    const teams = dbQueries.getLeagueTeams(leagueId);
+    const standings = dbQueries.calculateLeagueStandings(leagueId);
+    const storage = JSON.parse(fs.readFileSync(path.join(__dirname, '../../data/storage.json'), 'utf-8'));
+    const matches = (storage.matches || []).filter(m => m.league_id === leagueId);
+
+    res.json({
+      success: true,
+      league,
+      teams,
+      standings,
+      matches
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// Register Team into League (Supports Team Managers & Admin, max 10 validation)
+app.post('/api/leagues/:id/teams', checkAnyAuth, (req, res) => {
+  try {
+    const leagueId = parseInt(req.params.id, 10);
+    const { name, district, coach, contact, pool } = req.body;
+
+    if (!name) {
+      return res.status(400).json({ success: false, message: 'Team Name is required.' });
+    }
+
+    const result = dbQueries.registerLeagueTeam(leagueId, {
+      name,
+      district: district || 'State District',
+      coach: coach || 'Head Coach',
+      contact: contact || '',
+      pool: pool || 'Pool A'
+    });
+
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// Calculate and fetch live standings
+app.get('/api/leagues/:id/standings', (req, res) => {
+  try {
+    const leagueId = parseInt(req.params.id, 10);
+    const standings = dbQueries.calculateLeagueStandings(leagueId);
+    res.json({ success: true, standings });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// Schedule Match for League with duplicate prevention and validation
+app.post('/api/leagues/:id/matches/schedule', checkAnyAuth, (req, res) => {
+  try {
+    const leagueId = parseInt(req.params.id, 10);
+    const { round_name, player1, player2, table_number, match_date, match_time, bracket_pos } = req.body;
+
+    if (!player1 || !player2) {
+      return res.status(400).json({ success: false, message: 'Both Team 1 and Team 2 are required.' });
+    }
+    if (player1.trim().toLowerCase() === player2.trim().toLowerCase()) {
+      return res.status(400).json({ success: false, message: 'A team cannot play against itself!' });
+    }
+
+    const storage = JSON.parse(fs.readFileSync(path.join(__dirname, '../../data/storage.json'), 'utf-8'));
+    // Prevent duplicate active fixtures
+    const duplicate = (storage.matches || []).find(m => 
+      m.league_id === leagueId && 
+      m.round_name === round_name && 
+      ((m.player1 === player1 && m.player2 === player2) || (m.player1 === player2 && m.player2 === player1))
+    );
+    if (duplicate) {
+      return res.status(400).json({ success: false, message: 'This fixture has already been scheduled for this round!' });
+    }
+
+    const newMatch = dbQueries.createMatch({
+      league_id: leagueId,
+      tournament_id: 0,
+      round_name: round_name || 'Group Stage',
+      bracket_pos: bracket_pos || 'GROUP',
+      player1: player1.trim(),
+      player2: player2.trim(),
+      table_number: table_number || 'Court / Ground 1',
+      scheduled_date: match_date || null,
+      scheduled_time: match_time || null,
+      status: 'SCHEDULED'
+    });
+
+    res.json({ success: true, match: newMatch, message: 'Match scheduled successfully!' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// Update League Match Score (Accessible by Referee or Admin)
+app.post('/api/leagues/:id/matches/:matchId/score', checkAnyAuth, async (req, res) => {
+  try {
+    const leagueId = parseInt(req.params.id, 10);
+    const matchId = parseInt(req.params.matchId, 10);
+    const { player1_score, player2_score, status, winner } = req.body;
+
+    const s1 = parseInt(player1_score, 10) || 0;
+    const s2 = parseInt(player2_score, 10) || 0;
+
+    let computedWinner = winner;
+    if (!computedWinner) {
+      if (s1 > s2) computedWinner = 'TEAM_1';
+      else if (s2 > s1) computedWinner = 'TEAM_2';
+      else computedWinner = 'DRAW';
+    }
+
+    const updated = dbQueries.updateMatch(matchId, {
+      player1_score: s1,
+      player2_score: s2,
+      live_score: `${s1} - ${s2}`,
+      winner: computedWinner,
+      status: status || 'COMPLETED',
+      completed_at: status === 'COMPLETED' ? new Date().toISOString() : null
+    });
+
+    // Recompute standings
+    const standings = dbQueries.calculateLeagueStandings(leagueId);
+
+    // If playoff match completed and has next_match_id, forward winner
+    if (status === 'COMPLETED' && updated && updated.next_match_id) {
+      const nextMatch = dbQueries.getMatch(updated.next_match_id);
+      if (nextMatch) {
+        const winningTeamName = computedWinner === 'TEAM_1' ? updated.player1 : (computedWinner === 'TEAM_2' ? updated.player2 : updated.player1);
+        if (updated.bracket_pos === 'SF-1') {
+          dbQueries.updateMatch(nextMatch.id, { player1: winningTeamName });
+        } else if (updated.bracket_pos === 'SF-2') {
+          dbQueries.updateMatch(nextMatch.id, { player2: winningTeamName });
+        }
+      }
+    }
+
+    res.json({ success: true, match: updated, standings, message: 'Score updated and standings recalculated!' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// Auto-generate Semifinal & Final Playoffs from Pool Standings
+app.post('/api/leagues/:id/generate-playoffs', checkAdminAuth, (req, res) => {
+  try {
+    const leagueId = parseInt(req.params.id, 10);
+    const result = dbQueries.generatePlayoffsMatches(leagueId);
     if (!result.success) return res.status(400).json(result);
     res.json(result);
   } catch (err) {
