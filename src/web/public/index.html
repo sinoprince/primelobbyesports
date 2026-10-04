@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Prime Lobby Esports — Tournament Management Software</title>
+  <title>Prime Lobby Esports — Tournament & League Hub</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -14,21 +14,27 @@
   <!-- Login Modal / Screen (Admin-Only Access) -->
   <div id="loginOverlay" class="login-overlay">
     <div class="login-card">
-      <div class="brand-badge">🛡️ ADMIN PORTAL ACCESS</div>
+      <div class="brand-badge">🛡️ SECURE ADMIN PORTAL</div>
+      <div class="login-icon-circle">⚡</div>
       <h2>Prime Lobby Esports</h2>
-      <p class="subtitle">Tournament Management & Broadcast Command Center</p>
+      <p class="subtitle">Competitive Gaming Operations & Broadcast Command</p>
 
       <form id="loginForm" onsubmit="handleLogin(event)">
         <!-- Admin PIN field -->
         <div class="form-group" id="loginAdminGroup">
-          <label for="adminPin">Admin Access PIN / Secret Key</label>
-          <input type="password" id="adminPin" placeholder="Enter Admin Secret PIN" required autocomplete="current-password">
+          <label for="adminPin">Admin Security PIN</label>
+          <div class="input-with-icon">
+            <span class="field-icon">🔑</span>
+            <input type="password" id="adminPin" placeholder="Enter Admin Secret PIN..." required autocomplete="current-password">
+          </div>
         </div>
 
-        <button type="submit" id="loginSubmitBtn" class="btn btn-primary btn-block">🔓 Access Management Software</button>
+        <button type="submit" id="loginSubmitBtn" class="btn btn-primary btn-block btn-lg">
+          <span>🚀 Enter Admin Workspace</span>
+        </button>
       </form>
       <div id="loginError" class="alert alert-danger hidden"></div>
-      <p class="login-footer">🔒 Restricted to authorized Discord Server Administrators & Staff.</p>
+      <p class="login-footer">🔒 Protected area. Authorized Discord Server Administrators & Staff only.</p>
     </div>
   </div>
 
@@ -37,30 +43,38 @@
 
     <!-- Top Navigation Bar -->
     <header class="top-nav">
-      <div class="nav-brand">
-        <span class="logo-icon">🎮</span>
-        <div>
-          <span class="brand-title">PRIME LOBBY ESPORTS #8842</span>
-          <span class="brand-sub" id="currentRoleBadge">PUBG Mobile & Valorant Tournament Manager</span>
+      <div class="nav-left">
+        <button class="mobile-menu-btn" onclick="toggleSidebar()" aria-label="Toggle Navigation Menu">
+          <span></span><span></span><span></span>
+        </button>
+        <div class="nav-brand">
+          <div class="brand-logo-badge">⚡</div>
+          <div>
+            <div class="brand-title">PRIME LOBBY ESPORTS</div>
+            <div class="brand-sub" id="currentRoleBadge">PUBG Mobile & Valorant Hub #8842</div>
+          </div>
         </div>
       </div>
 
-      <nav class="nav-tabs">
-        <button class="nav-tab active" onclick="switchTab('tournaments')">🏆 Tournaments Center</button>
-        <button class="nav-tab" onclick="switchTab('payments')">💳 Payment Ledger</button>
-        <button class="nav-tab" onclick="switchTab('tickets')">🎫 Support Tickets</button>
-        <button class="nav-tab" onclick="switchTab('scoreboard')">📊 Match Scoreboard</button>
-        <button class="nav-tab" onclick="switchTab('participants')">👥 Teams & Slots</button>
-        <button class="nav-tab" onclick="switchTab('announcements')">📢 Announcements</button>
-        <button class="nav-tab" onclick="switchTab('setup')">⚙️ Bot & Server Setup</button>
-        <button class="nav-tab" onclick="switchTab('gateway')">💳 UPI Gateway Config</button>
-        <button class="nav-tab" onclick="switchTab('system')">📈 System Health & Logs</button>
+      <nav class="nav-tabs" id="mainNavTabs">
+        <button class="nav-tab active" onclick="switchTab('tournaments')"><span class="tab-icon">🏆</span><span>Tournaments</span></button>
+        <button class="nav-tab" onclick="switchTab('payments')"><span class="tab-icon">💳</span><span>Payments</span></button>
+        <button class="nav-tab" onclick="switchTab('tickets')"><span class="tab-icon">🎫</span><span>Support</span></button>
+        <button class="nav-tab" onclick="switchTab('scoreboard')"><span class="tab-icon">📊</span><span>Scoreboard</span></button>
+        <button class="nav-tab" onclick="switchTab('participants')"><span class="tab-icon">👥</span><span>Teams & Slots</span></button>
+        <button class="nav-tab" onclick="switchTab('announcements')"><span class="tab-icon">📢</span><span>Announce</span></button>
+        <button class="nav-tab" onclick="switchTab('setup')"><span class="tab-icon">⚙️</span><span>Setup Hub</span></button>
+        <button class="nav-tab" onclick="switchTab('gateway')"><span class="tab-icon">💸</span><span>UPI Gateway</span></button>
+        <button class="nav-tab" onclick="switchTab('system')"><span class="tab-icon">📈</span><span>System Health</span></button>
       </nav>
 
       <div class="nav-actions">
-        <span class="status-indicator online" id="currentUserDisplay">● Live Synced</span>
-        <button class="btn btn-sm btn-outline" onclick="refreshCurrentTab()">🔄 Refresh</button>
-        <button class="btn btn-sm btn-danger-outline" onclick="logout()">Logout</button>
+        <div class="status-pill online" id="currentUserDisplay" title="Real-time WebSocket Link Active">
+          <span class="live-dot"></span>
+          <span>Live Synced</span>
+        </div>
+        <button class="btn btn-sm btn-outline" onclick="refreshCurrentTab()" title="Fetch Fresh Data">🔄 Refresh</button>
+        <button class="btn btn-sm btn-danger-outline" onclick="logout()" title="Exit Admin Session">Logout</button>
       </div>
     </header>
 

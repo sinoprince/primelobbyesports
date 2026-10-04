@@ -206,6 +206,14 @@ async function initDashboard() {
   setInterval(loadStats, 30000);
 }
 
+// Mobile Navigation Toggle
+function toggleSidebar() {
+  const tabs = document.getElementById('mainNavTabs');
+  if (tabs) {
+    tabs.classList.toggle('open');
+  }
+}
+
 // Tab Switching
 function switchTab(tabName) {
   currentTab = tabName;
@@ -217,6 +225,12 @@ function switchTab(tabName) {
 
   const targetPane = document.getElementById(`tab-${tabName}`);
   if (targetPane) targetPane.classList.add('active');
+
+  // Auto-close mobile menu if open
+  const tabs = document.getElementById('mainNavTabs');
+  if (tabs && tabs.classList.contains('open')) {
+    tabs.classList.remove('open');
+  }
 
   refreshCurrentTab();
 }
