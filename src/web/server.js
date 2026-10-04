@@ -657,6 +657,77 @@ app.post('/api/setup', checkAdminAuth, async (req, res) => {
   }
 });
 
+// 11. Payment Gateway Configuration Endpoints
+app.get('/api/settings/payment', checkAdminAuth, (req, res) => {
+  try {
+    const settings = dbQueries.getPaymentSettings();
+    res.json({ success: true, settings });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.post('/api/settings/payment', checkAdminAuth, (req, res) => {
+  try {
+    const { upiId, internationalUpiId, accountName } = req.body;
+    if (!upiId) {
+      return res.status(400).json({ success: false, message: 'Domestic UPI ID is required.' });
+    }
+    const updated = dbQueries.updatePaymentSettings({
+      upiId: upiId.trim(),
+      internationalUpiId: internationalUpiId ? internationalUpiId.trim() : null,
+      accountName: accountName ? accountName.trim() : 'Prime Lobby Esports'
+    });
+    res.json({ success: true, message: 'Payment UPI gateway configuration updated successfully!', settings: updated });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// 12. Bot System Health & Real-time Metrics Endpoint
+app.get('/api/system/health', checkAdminAuth, async (req, res) => {
+  try {
+    const client = await botBridge.getClient();
+    const memory = process.memoryUsage();
+    const uptimeSeconds = Math.floor(process.uptime());
+
+    const days = Math.floor(uptimeSeconds / (3600 * 24));
+    const hours = Math.floor((uptimeSeconds % (3600 * 24)) / 3600);
+    const minutes = Math.floor((uptimeSeconds % 3600) / 60);
+    const seconds = uptimeSeconds % 60;
+    const uptimeFormatted = `${days > 0 ? `${days}d ` : ''}${hours}h ${minutes}m ${seconds}s`;
+
+    const isConnected = Boolean(client && client.isReady());
+    const ping = isConnected ? Math.round(client.ws.ping) : null;
+    const guildCount = isConnected ? client.guilds.cache.size : 0;
+    const userCount = isConnected ? client.users.cache.size : 0;
+    const botTag = isConnected ? client.user.tag : 'Prime Lobby Esports #8842';
+
+    res.json({
+      success: true,
+      health: {
+        botTag,
+        status: isConnected ? 'ONLINE' : (process.env.DISCORD_TOKEN ? 'CONNECTING' : 'OFFLINE'),
+        ping: ping !== null ? `${ping} ms` : 'N/A',
+        uptime: uptimeFormatted,
+        uptimeSeconds,
+        memoryUsage: {
+          rss: `${Math.round(memory.rss / 1024 / 1024)} MB`,
+          heapUsed: `${Math.round(memory.heapUsed / 1024 / 1024)} MB`,
+          heapTotal: `${Math.round(memory.heapTotal / 1024 / 1024)} MB`
+        },
+        nodeVersion: process.version,
+        platform: process.platform,
+        guildCount,
+        userCount,
+        timestamp: new Date().toISOString()
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // ═══════════════════════════════════════════════════════════════════════════
 // 11. SPORTS LEAGUE & TOURNAMENT MANAGEMENT ENDPOINTS (School / State Meets)
 // ═══════════════════════════════════════════════════════════════════════════

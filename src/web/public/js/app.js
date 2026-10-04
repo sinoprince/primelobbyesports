@@ -235,6 +235,10 @@ function refreshCurrentTab() {
     loadTickets();
   } else if (currentTab === 'announcements') {
     loadChannels();
+  } else if (currentTab === 'gateway') {
+    loadGatewaySettings();
+  } else if (currentTab === 'system') {
+    loadSystemHealth();
   }
 }
 
@@ -550,6 +554,9 @@ function loadParticipantsTab() {
   loadParticipantsForSelected();
 }
 
+let cachedSelectedTournament = null;
+let cachedSelectedParticipants = [];
+
 async function loadParticipantsForSelected() {
   const select = document.getElementById('participantTourneySelect');
   const tbody = document.getElementById('participantsTableBody');
@@ -558,6 +565,8 @@ async function loadParticipantsForSelected() {
 
   const tourneyId = select.value;
   if (!tourneyId) {
+    cachedSelectedTournament = null;
+    cachedSelectedParticipants = [];
     banner.classList.add('hidden');
     tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">Select a tournament above to view registered teams.</td></tr>';
     return;
@@ -569,8 +578,11 @@ async function loadParticipantsForSelected() {
     return;
   }
 
-  const tourney = data.tournament;
-  const parts = data.participants || [];
+  cachedSelectedTournament = data.tournament;
+  cachedSelectedParticipants = data.participants || [];
+
+  const tourney = cachedSelectedTournament;
+  const parts = cachedSelectedParticipants;
 
   // Slot balance calculation
   const confirmedCount = parts.filter(p => p.slotStatus === 'CONFIRMED' || p.paid).length;
@@ -602,13 +614,22 @@ async function loadParticipantsForSelected() {
   `;
   banner.classList.remove('hidden');
 
-  if (parts.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No teams registered for this tournament yet.</td></tr>';
+  renderParticipantsTable(cachedSelectedParticipants);
+}
+
+function renderParticipantsTable(parts) {
+  const tbody = document.getElementById('participantsTableBody');
+  if (!tbody) return;
+  const tourney = cachedSelectedTournament;
+
+  if (!parts || parts.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No teams found matching search criteria.</td></tr>';
     return;
   }
 
   tbody.innerHTML = parts.map((p, idx) => {
     const isPaid = p.paid || p.slotStatus === 'CONFIRMED';
+    const tourneyId = tourney ? tourney.id : '';
 
     return `
       <tr>
@@ -617,7 +638,7 @@ async function loadParticipantsForSelected() {
         <td><code>${escapeHtml(p.ign || p.inGameId || 'N/A')}</code></td>
         <td>${escapeHtml(p.username || p.tag || p.userId)}</td>
         <td>
-          <select class="status-badge-select ${isPaid ? 'badge-confirmed' : 'badge-reserved'}" onchange="changeParticipantStatus('${tourney.id}', '${p.userId}', this.value)" title="Click to Change Slot Booking / Payment Status">
+          <select class="status-badge-select ${isPaid ? 'badge-confirmed' : 'badge-reserved'}" onchange="changeParticipantStatus('${tourneyId}', '${p.userId}', this.value)" title="Click to Change Slot Booking / Payment Status">
             <option value="CONFIRMED" ${isPaid ? 'selected' : ''}>✅ CONFIRMED</option>
             <option value="PENDING" ${!isPaid ? 'selected' : ''}>⏳ RESERVED (UNPAID)</option>
           </select>
@@ -626,16 +647,66 @@ async function loadParticipantsForSelected() {
         <td>
           <div class="action-btn-group">
             ${!isPaid ? `
-              <button class="btn btn-xs btn-success" onclick="changeParticipantStatus('${tourney.id}', '${p.userId}', 'CONFIRMED')" title="Approve & Confirm Slot">✅ Confirm Slot</button>
+              <button class="btn btn-xs btn-success" onclick="changeParticipantStatus('${tourneyId}', '${p.userId}', 'CONFIRMED')" title="Approve & Confirm Slot">✅ Confirm Slot</button>
             ` : `
-              <button class="btn btn-xs btn-warning" onclick="changeParticipantStatus('${tourney.id}', '${p.userId}', 'PENDING')" title="Revert back to Unpaid">⏳ Revert to Unpaid</button>
+              <button class="btn btn-xs btn-warning" onclick="changeParticipantStatus('${tourneyId}', '${p.userId}', 'PENDING')" title="Revert back to Unpaid">⏳ Revert to Unpaid</button>
             `}
-            <button class="btn btn-xs btn-danger-outline" onclick="removeParticipant('${tourney.id}', '${p.userId}')" title="Kick participant and release slot back">❌ Kick</button>
+            <button class="btn btn-xs btn-danger-outline" onclick="removeParticipant('${tourneyId}', '${p.userId}')" title="Kick participant and release slot back">❌ Kick</button>
           </div>
         </td>
       </tr>
     `;
   }).join('');
+}
+
+function handleParticipantSearch(query) {
+  const q = (query || '').toLowerCase().trim();
+  if (!cachedSelectedParticipants) return;
+  if (!q) {
+    renderParticipantsTable(cachedSelectedParticipants);
+    return;
+  }
+
+  const filtered = cachedSelectedParticipants.filter(p => {
+    const team = (p.teamName || '').toLowerCase();
+    const ign = (p.ign || p.inGameId || '').toLowerCase();
+    const user = (p.username || p.tag || p.userId || '').toLowerCase();
+    return team.includes(q) || ign.includes(q) || user.includes(q);
+  });
+  renderParticipantsTable(filtered);
+}
+
+function exportParticipantsToCSV() {
+  if (!cachedSelectedTournament || !cachedSelectedParticipants || cachedSelectedParticipants.length === 0) {
+    showToast('No participants available to export. Select a tournament with registered teams.', 'warning');
+    return;
+  }
+
+  const t = cachedSelectedTournament;
+  const headers = ['Slot Number', 'Team Name', 'IGN / In-Game ID', 'Discord User / ID', 'Payment Status', 'Registered Date'];
+  const rows = cachedSelectedParticipants.map((p, idx) => {
+    const isPaid = (p.paid || p.slotStatus === 'CONFIRMED') ? 'CONFIRMED' : 'RESERVED (UNPAID)';
+    const dateStr = p.registeredAt ? new Date(p.registeredAt).toISOString() : '';
+    return [
+      idx + 1,
+      `"${(p.teamName || 'Solo Player').replace(/"/g, '""')}"`,
+      `"${(p.ign || p.inGameId || 'N/A').replace(/"/g, '""')}"`,
+      `"${(p.username || p.tag || p.userId || '').replace(/"/g, '""')}"`,
+      `"${isPaid}"`,
+      `"${dateStr}"`
+    ].join(',');
+  });
+
+  const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows].join('\n');
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement('a');
+  link.setAttribute('href', encodedUri);
+  const safeName = (t.name || t.title || 'Tournament').replace(/[^a-z0-9_-]/gi, '_');
+  link.setAttribute('download', `${safeName}_Participants.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  showToast(`Exported ${cachedSelectedParticipants.length} teams to CSV!`, 'success');
 }
 
 async function changeParticipantStatus(tourneyId, userId, newStatus) {
@@ -2035,5 +2106,148 @@ async function handleGeneratePlayoffs() {
     loadActiveLeagueDetails(activeLeagueId);
   } else {
     showToast(res ? res.message : 'Cannot generate playoffs yet', 'danger');
+  }
+}
+
+// ==========================================
+// TAB 7: Bot & Server Setup Hub Functions
+// ==========================================
+async function triggerServerSetup(type = 'all', cleanRebuild = false) {
+  let promptMsg = 'Run Discord Server Setup?';
+  if (cleanRebuild) {
+    promptMsg = '⚠️ WARNING: Clean rebuild will delete existing tournament/bot channels and recreate the full server structure. Continue?';
+  } else if (type === 'games') {
+    promptMsg = 'Deploy the 4 Game Categories (PUBG, Valorant, Free Fire, eFootball) and role-locked channels?';
+  } else if (type === 'rules') {
+    promptMsg = 'Post Rules & Verification Embed to the rules channel?';
+  } else if (type === 'tickets') {
+    promptMsg = 'Deploy Support Helpdesk panel and voice channel?';
+  }
+
+  if (!confirm(promptMsg)) return;
+
+  try {
+    showToast('Executing Discord server setup via Prime Lobby Esports...', 'info');
+    const res = await apiFetch('/api/setup', {
+      method: 'POST',
+      body: JSON.stringify({ type, cleanRebuild })
+    });
+
+    if (res && res.success) {
+      showToast(res.message || 'Server setup completed successfully on Discord!', 'success');
+      loadChannels();
+    } else {
+      showToast(res ? res.error : 'Failed to execute setup', 'danger');
+    }
+  } catch (err) {
+    showToast('Setup error: ' + err.message, 'danger');
+  }
+}
+
+// ==========================================
+// TAB 8: Payment UPI Gateway Configuration
+// ==========================================
+async function loadGatewaySettings() {
+  try {
+    const res = await apiFetch('/api/settings/payment');
+    if (!res || !res.success) return;
+    const s = res.settings || {};
+
+    const domesticInput = document.getElementById('gatewayDomesticUpi');
+    const intlInput = document.getElementById('gatewayInternationalUpi');
+    const accountInput = document.getElementById('gatewayAccountName');
+    const qrImg = document.getElementById('gatewayQrPreview');
+    const qrLabel = document.getElementById('gatewayQrLabel');
+
+    if (domesticInput) domesticInput.value = s.domesticUpi || '';
+    if (intlInput) intlInput.value = s.internationalUpi || '';
+    if (accountInput) accountInput.value = s.accountName || '';
+
+    if (qrImg && s.domesticUpi) {
+      const upiUrl = `upi://pay?pa=${encodeURIComponent(s.domesticUpi)}&pn=${encodeURIComponent(s.accountName || 'Prime Lobby Esports')}&cu=INR`;
+      qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(upiUrl)}`;
+    }
+    if (qrLabel && s.domesticUpi) {
+      qrLabel.innerText = `Scan to Pay: ${s.domesticUpi}`;
+    }
+  } catch (err) {
+    console.error('Error loading gateway settings:', err);
+  }
+}
+
+async function handleSaveGatewaySettings(e) {
+  e.preventDefault();
+  const btn = document.getElementById('btnSaveGateway');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerText = '⏳ Saving...';
+  }
+
+  const domesticUpi = document.getElementById('gatewayDomesticUpi')?.value.trim();
+  const internationalUpi = document.getElementById('gatewayInternationalUpi')?.value.trim();
+  const accountName = document.getElementById('gatewayAccountName')?.value.trim();
+
+  try {
+    const res = await apiFetch('/api/settings/payment', {
+      method: 'POST',
+      body: JSON.stringify({ domesticUpi, internationalUpi, accountName })
+    });
+
+    if (res && res.success) {
+      showToast(res.message || 'Payment Gateway settings updated & synced!', 'success');
+      loadGatewaySettings();
+    } else {
+      showToast(res ? res.error : 'Failed to update gateway settings', 'danger');
+    }
+  } catch (err) {
+    showToast('Error saving gateway settings: ' + err.message, 'danger');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerText = '💾 Save UPI Gateway Settings';
+    }
+  }
+}
+
+// ==========================================
+// TAB 9: System Health & Live Bot Metrics
+// ==========================================
+async function loadSystemHealth() {
+  try {
+    const res = await apiFetch('/api/system/health');
+    if (!res || !res.success) return;
+    const h = res.health || {};
+
+    const statusEl = document.getElementById('sysHealthStatus');
+    const pingEl = document.getElementById('sysHealthPing');
+    const uptimeEl = document.getElementById('sysHealthUptime');
+    const memEl = document.getElementById('sysHealthMemory');
+    const heapEl = document.getElementById('sysHealthHeap');
+    const tagEl = document.getElementById('sysHealthTag');
+
+    if (statusEl) {
+      statusEl.innerText = h.botStatus || 'ONLINE';
+      statusEl.className = h.botStatus === 'ONLINE' ? 'stat-value text-success' : 'stat-value text-warning';
+    }
+    if (tagEl && h.botTag) tagEl.innerText = h.botTag;
+    if (pingEl) pingEl.innerText = h.ping !== undefined ? `${h.ping} ms` : '-- ms';
+    if (uptimeEl) uptimeEl.innerText = h.uptimeFormatted || `${h.uptimeSeconds || 0}s`;
+    if (memEl && h.memory) memEl.innerText = `${h.memory.rssMb} MB`;
+    if (heapEl && h.memory) heapEl.innerText = `Heap: ${h.memory.heapUsedMb} MB / ${h.memory.heapTotalMb} MB`;
+
+    // Process & Platform Details
+    const nodeEl = document.getElementById('sysNodeVer');
+    const platEl = document.getElementById('sysPlatform');
+    const guildEl = document.getElementById('sysGuildCount');
+    const userEl = document.getElementById('sysUserCount');
+    const timeEl = document.getElementById('sysTimestamp');
+
+    if (nodeEl) nodeEl.innerText = h.nodeVersion || process?.version || 'Node.js';
+    if (platEl) platEl.innerText = `${h.platform || ''} (${h.arch || ''})`;
+    if (guildEl) guildEl.innerText = `${h.guildCount || 0} Server(s)`;
+    if (userEl) userEl.innerText = `${h.userCount || 0} Cached Users`;
+    if (timeEl) timeEl.innerText = new Date(h.timestamp || Date.now()).toLocaleTimeString();
+  } catch (err) {
+    console.error('Error loading system health:', err);
   }
 }

@@ -915,6 +915,50 @@ const dbQueries = {
       saveDatabase();
     }
     return ticket;
+  },
+
+  // Payment UPI Configuration Settings
+  getPaymentSettings: () => {
+    const data = loadDatabase();
+    const config = require('../../config.json');
+    if (!data.payment_settings) {
+      data.payment_settings = {
+        upiId: config.payment?.upiId || 'sinoprince366-1@okhdfcbank',
+        internationalUpiId: config.payment?.internationalUpiId || 'sinoprince366-1@oksbi',
+        accountName: config.payment?.accountName || 'Prime Lobby Esports'
+      };
+      saveDatabase();
+    }
+    return data.payment_settings;
+  },
+
+  updatePaymentSettings: (settings) => {
+    const data = loadDatabase();
+    data.payment_settings = {
+      ...(data.payment_settings || {}),
+      ...settings,
+      updated_at: new Date().toISOString()
+    };
+    saveDatabase();
+
+    // Also synchronize into config.json for persistency
+    try {
+      const configPath = path.join(__dirname, '../../config.json');
+      if (fs.existsSync(configPath)) {
+        const conf = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+        conf.payment = {
+          ...(conf.payment || {}),
+          upiId: data.payment_settings.upiId,
+          internationalUpiId: data.payment_settings.internationalUpiId,
+          accountName: data.payment_settings.accountName
+        };
+        fs.writeFileSync(configPath, JSON.stringify(conf, null, 2), 'utf-8');
+      }
+    } catch (e) {
+      console.warn('[DB] Could not sync config.json:', e.message);
+    }
+
+    return data.payment_settings;
   }
 };
 

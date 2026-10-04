@@ -52,6 +52,9 @@
         <button class="nav-tab" onclick="switchTab('scoreboard')">📊 Match Scoreboard</button>
         <button class="nav-tab" onclick="switchTab('participants')">👥 Teams & Slots</button>
         <button class="nav-tab" onclick="switchTab('announcements')">📢 Announcements</button>
+        <button class="nav-tab" onclick="switchTab('setup')">⚙️ Bot & Server Setup</button>
+        <button class="nav-tab" onclick="switchTab('gateway')">💳 UPI Gateway Config</button>
+        <button class="nav-tab" onclick="switchTab('system')">📈 System Health & Logs</button>
       </nav>
 
       <div class="nav-actions">
@@ -141,6 +144,8 @@
                 <option value="">Select Tournament...</option>
               </select>
             </div>
+            <input type="text" id="participantSearchInput" placeholder="🔍 Search Team, IGN, or User ID..." oninput="handleParticipantSearch(this.value)" style="padding: 7px 12px; border-radius: 6px; background: var(--bg-card); color: #fff; border: 1px solid var(--border-color); font-size: 0.85rem; min-width: 220px;">
+            <button class="btn btn-outline" onclick="exportParticipantsToCSV()">📥 Export CSV / Excel</button>
             <button class="btn btn-primary" onclick="openAddTeamModal()">➕ Add Team</button>
           </div>
         </div>
@@ -528,6 +533,176 @@
 
             <button type="submit" id="btnSendAnnouncement" class="btn btn-primary btn-block">🚀 Broadcast Announcement to Discord Channels</button>
           </form>
+        </div>
+      </section>
+
+      <!-- TAB 7: Bot & Server Setup Hub -->
+      <section id="tab-setup" class="tab-pane">
+        <div class="pane-header">
+          <div>
+            <h2>⚙️ Bot & Discord Server Setup Hub</h2>
+            <p>One-click management to deploy official categories, rules verification, game hubs, and clean obsolete channels.</p>
+          </div>
+        </div>
+
+        <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); margin-bottom: 25px;">
+          <!-- Card 1: Complete Setup -->
+          <div class="stat-card" style="border-top: 3px solid #00E676;">
+            <div style="font-size: 1.8rem; margin-bottom: 8px;">🚀</div>
+            <h3 style="margin: 0 0 6px; font-size: 1.15rem; color: #fff;">Full Server Clean Rebuild</h3>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0 0 14px; line-height: 1.4;">
+              Deploys all server categories, rules verification panel, ticket desk, 4 game hubs, and payment verification channel.
+            </p>
+            <div style="display: flex; gap: 8px; flex-direction: column;">
+              <button class="btn btn-primary btn-block" onclick="triggerServerSetup('all', true)">⚡ Run Clean Rebuild</button>
+              <button class="btn btn-outline btn-block" onclick="triggerServerSetup('all', false)">🛠️ Setup Without Deleting</button>
+            </div>
+          </div>
+
+          <!-- Card 2: 4 Game Hubs -->
+          <div class="stat-card" style="border-top: 3px solid #00B0FF;">
+            <div style="font-size: 1.8rem; margin-bottom: 8px;">🎮</div>
+            <h3 style="margin: 0 0 6px; font-size: 1.15rem; color: #fff;">Deploy Game Hubs & Roles</h3>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0 0 14px; line-height: 1.4;">
+              Initializes PUBG Mobile, Valorant, Free Fire & eFootball categories, role-locked text & voice channels, and dropdown menu.
+            </p>
+            <button class="btn btn-outline btn-block" style="margin-top: auto;" onclick="triggerServerSetup('games')">🎮 Deploy 4 Game Categories</button>
+          </div>
+
+          <!-- Card 3: Rules & Verification -->
+          <div class="stat-card" style="border-top: 3px solid #FFAB00;">
+            <div style="font-size: 1.8rem; margin-bottom: 8px;">📜</div>
+            <h3 style="margin: 0 0 6px; font-size: 1.15rem; color: #fff;">Rules & Member Verification</h3>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0 0 14px; line-height: 1.4;">
+              Posts official server regulations embed with interactive <strong>"Verify / Accept Rules"</strong> button for Visitor to Member promotion.
+            </p>
+            <button class="btn btn-outline btn-block" style="margin-top: auto;" onclick="triggerServerSetup('rules')">📜 Post Rules & Verification</button>
+          </div>
+
+          <!-- Card 4: Support Ticket Desk -->
+          <div class="stat-card" style="border-top: 3px solid #E040FB;">
+            <div style="font-size: 1.8rem; margin-bottom: 8px;">🎫</div>
+            <h3 style="margin: 0 0 6px; font-size: 1.15rem; color: #fff;">Deploy Support Helpdesk</h3>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0 0 14px; line-height: 1.4;">
+              Creates <code>#🎫-support-helpdesk</code> channel with interactive open ticket buttons and admin-moderated voice waiting lounge.
+            </p>
+            <button class="btn btn-outline btn-block" style="margin-top: auto;" onclick="triggerServerSetup('tickets')">🎫 Deploy Ticket Panel</button>
+          </div>
+        </div>
+
+        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 8px; padding: 18px;">
+          <h4 style="margin: 0 0 8px; color: #fff; font-size: 1rem;">🛡️ Single-Bot Operational Notice</h4>
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0; line-height: 1.5;">
+            All automated features are executed by <strong>Prime Lobby Esports #8842</strong>. You can trigger these actions safely without needing to type slash commands into Discord.
+          </p>
+        </div>
+      </section>
+
+      <!-- TAB 8: Payment UPI Gateway Configuration -->
+      <section id="tab-gateway" class="tab-pane">
+        <div class="pane-header">
+          <div>
+            <h2>💳 Payment Gateway & UPI Settings</h2>
+            <p>Update UPI IDs, Beneficiary Name, and live payment instructions without code or file edits.</p>
+          </div>
+        </div>
+
+        <div class="scoreboard-layout-grid" style="grid-template-columns: 1.1fr 0.9fr;">
+          <!-- Settings Form -->
+          <div class="scoreboard-form-card">
+            <h3>UPI Payment Details</h3>
+            <form id="gatewaySettingsForm" onsubmit="handleSaveGatewaySettings(event)">
+              <div class="form-group">
+                <label for="gatewayDomesticUpi">🇮🇳 Domestic UPI ID (India GPay / PhonePe / Paytm)</label>
+                <input type="text" id="gatewayDomesticUpi" required placeholder="e.g. yourname@okhdfcbank" style="font-family: monospace; font-size: 0.95rem;">
+                <span style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-top: 4px;">Used for all Indian entry fee deposits and QR generation.</span>
+              </div>
+
+              <div class="form-group">
+                <label for="gatewayInternationalUpi">🌐 International Receive UPI / Alternate ID (Optional)</label>
+                <input type="text" id="gatewayInternationalUpi" placeholder="e.g. yourname@oksbi" style="font-family: monospace; font-size: 0.95rem;">
+              </div>
+
+              <div class="form-group">
+                <label for="gatewayAccountName">Beneficiary / Business Display Name</label>
+                <input type="text" id="gatewayAccountName" required placeholder="Prime Lobby Esports">
+              </div>
+
+              <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button type="submit" id="btnSaveGateway" class="btn btn-primary" style="flex: 1;">💾 Save UPI Gateway Settings</button>
+                <button type="button" class="btn btn-outline" onclick="loadGatewaySettings()">🔄 Reset</button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Live QR Code Preview -->
+          <div class="scoreboard-results-card">
+            <h3 style="margin: 0 0 12px; color: #fff;">📱 Live QR Code Preview</h3>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 15px;">
+              This QR code is generated dynamically from your active settings and sent to players via DM upon registration.
+            </p>
+            <div style="background: #ffffff; border-radius: 8px; padding: 20px; text-align: center; max-width: 250px; margin: 0 auto 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
+              <img id="gatewayQrPreview" src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=upi%3A%2F%2Fpay%3Fpa%3Dsinoprince366-1%40okhdfcbank%26pn%3DPrime%2520Lobby%2520Esports%26cu%3DINR" alt="UPI QR Preview" style="width: 100%; height: auto; display: block;">
+              <span id="gatewayQrLabel" style="color: #000; font-size: 0.75rem; font-weight: 700; display: block; margin-top: 8px;">Scan with Any UPI App</span>
+            </div>
+            <div style="background: rgba(0,230,118,0.06); border: 1px solid rgba(0,230,118,0.2); border-radius: 6px; padding: 12px; font-size: 0.8rem; color: #c9d1d9;">
+              ✅ <strong>Auto-Sync:</strong> Saving new UPI IDs automatically updates all future DM payment requests and invoices.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 9: System Health & Bot Metrics -->
+      <section id="tab-system" class="tab-pane">
+        <div class="pane-header">
+          <div>
+            <h2>📈 Bot System Health & Real-time Metrics</h2>
+            <p>Live memory usage, WebSocket ping, system uptime, and operational telemetry.</p>
+          </div>
+          <button class="btn btn-outline" onclick="loadSystemHealth()">🔄 Refresh Metrics</button>
+        </div>
+
+        <div class="stats-grid" style="margin-bottom: 24px;">
+          <div class="stat-card">
+            <div class="stat-header"><span class="stat-title">BOT STATUS</span><span>🤖</span></div>
+            <div class="stat-value text-success" id="sysHealthStatus">ONLINE</div>
+            <div class="stat-sub" id="sysHealthTag">Prime Lobby Esports #8842</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-header"><span class="stat-title">DISCORD WEBSOCKET PING</span><span>📶</span></div>
+            <div class="stat-value text-accent" id="sysHealthPing">-- ms</div>
+            <div class="stat-sub">Gateway Latency</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-header"><span class="stat-title">UPTIME</span><span>⏱️</span></div>
+            <div class="stat-value" id="sysHealthUptime">--</div>
+            <div class="stat-sub">Continuous Run Time</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-header"><span class="stat-title">MEMORY USAGE (RSS)</span><span>💾</span></div>
+            <div class="stat-value" id="sysHealthMemory">-- MB</div>
+            <div class="stat-sub" id="sysHealthHeap">Heap: -- MB</div>
+          </div>
+        </div>
+
+        <!-- Telemetry Details Table -->
+        <div class="table-container" style="background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border-color); padding: 16px;">
+          <h3 style="margin: 0 0 12px; color: #fff;">🖥️ Process & Host Environment</h3>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Property</th>
+                <th>Value</th>
+              </tr>
+            </thead>
+            <tbody id="sysHealthDetailsTable">
+              <tr><td>Node.js Version</td><td id="sysNodeVer">Loading...</td></tr>
+              <tr><td>Operating System</td><td id="sysPlatform">Loading...</td></tr>
+              <tr><td>Connected Guilds</td><td id="sysGuildCount">Loading...</td></tr>
+              <tr><td>Cached Users</td><td id="sysUserCount">Loading...</td></tr>
+              <tr><td>Last Heartbeat</td><td id="sysTimestamp">Loading...</td></tr>
+            </tbody>
+          </table>
         </div>
       </section>
 
